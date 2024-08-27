@@ -1,0 +1,91 @@
+digraph idealistic {
+
+    subgraph cluster_legend {
+        label="legend"
+        idata[label="IData"]
+        node[shape=box]
+        inode[label="INode"]
+    }
+
+    // data
+    quietadc[label="ADC IFrame, one APA"]
+    subgraph cluster_adcaf {
+        label="per 'channel-plane' ADC array"
+        adcu_af[label="ADC array"]
+        adcv_af[label="ADC array"]
+        adcw_af[label="ADC array"]
+    }
+    subgraph cluster_spu {
+        label="per 'channel-plane' sp array"
+        spu_af[label="sp array"]
+        spv_af[label="sp array"]
+        spw_af[label="sp array"]
+    }
+    sigframe[label="signal IFrame, one APA"]
+
+    // nodes
+    node[shape=box]
+    nf[label="NF"]
+    frame2af[label="to arrays"]
+    spu[label="SP"]
+    spv[label="SP"]
+    spw[label="SP"]
+    af2frame[label="to frame"]
+    dnnroi
+    
+    nf->quietadc->frame2af
+    frame2af->adcu_af->spu->spu_af
+    frame2af->adcv_af->spv->spv_af
+    frame2af->adcw_af->spw->spw_af
+    
+    spu_af->af2frame
+    spv_af->af2frame
+    spw_af->af2frame
+    af2frame->sigframe
+
+
+    subgraph cluster_sp {
+        label="Example SP subgraph"
+
+        node[shape=ellipse]
+        dc_adc[label="ADC array"]
+        dc_adc_spec[label="ADC spectra"]
+        dc_gauss_spec[label="Gauss spectra"]
+        dc_wiener_spec[label="Wiener spectra"]
+        dc_gauss[label="Gauss decon"]
+        dc_wiener[label="Wiener decon"]
+        dc_roi[label="ROIs"]
+        dc_signal[label="signal"]
+        
+        node[shape=box]
+        dc_gaussf[label="Gauss filter"]
+        dc_wienerf[label="Wiener filter"]
+        dc_fft[label="2D FFT"]
+        dc_fftg[label="2D invFFT"]
+        dc_fftw[label="2D invFFT"]
+        dc_signal_roi[label="ROI finding"]
+        dc_apply_roi[label="apply ROI"]
+
+
+        subgraph cluster_dnnroi {
+            label="Incomplete DNNROI subgraph";
+            node[shape=ellipse]
+            sigdnn
+            node[shape=box]
+            DNNROI
+
+            edge[constraint=false]
+            dc_gauss->DNNROI
+            dc_wiener->DNNROI
+            DNNROI->sigdnn
+        }            
+
+        dc_adc->dc_fft->dc_adc_spec
+        dc_adc_spec->dc_gaussf->dc_gauss_spec->dc_fftg->dc_gauss
+        dc_adc_spec->dc_wienerf->dc_wiener_spec->dc_fftw->dc_wiener
+        dc_wiener->dc_signal_roi->dc_roi->dc_apply_roi
+        dc_gauss->dc_apply_roi->dc_signal
+    }
+
+
+}
