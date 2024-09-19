@@ -1,0 +1,14 @@
+#+title: Wire-Cell Signal Processing, Next Generation.
+
+* Building
+
+This is a Wire-Cell User Package.  To build, eg with WCT and externals in PREFIX:
+
+#+begin_example
+$ ./wcb configure --prefix=$PREFIX --boost-mt --boost-libs=$PREFIX/lib --boost-include=$PREFIX/include --with-jsonnet-libs=gojsonnet 
+$ ./wcb
+#+end_example
+
+To set up ~PREFIX~ see for example
+
+https://www.phy.bnl.gov/~bviren/wire-cell/docs/wcwc-howto.html#spack-view-wct
