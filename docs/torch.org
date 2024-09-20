@@ -11,20 +11,20 @@ At low level one must utilize a ~torch::Device~.  WCT ~pytorch~ defines a ~Torch
 
 - A ~torch::Tensor~ is [[https://discuss.pytorch.org/t/tensor-move-semantics-in-c-frontend/77901/10][like a shared pointer]].
 
+- ~torch::Tensor::detach()~ disconnects the tensor from autograd
+
+- ~torch::Tensor::clone()~ makes a new tensor holding a copy of of the tensor.  See also ~torch::clone()~.
+
+
 * Coding
 
-Torch is most popularly used via its Python bindings.  The C++ API is similar but the lack of popularity can make learning how to do things via internet search difficult.  The C++ documentation is fairly good.  These entry pages should be given a linear read through:
+Torch is most popularly used via its Python bindings.  The C++ API is similar but the lack of popularity can make learning how to do things via internet search difficult.  The C++ documentation is fairly good.  These entry pages should be given a linear read through.  Here are some with brief topic summaries:
 
 - [[https://pytorch.org/cppdocs/][overview]] :: understand the major parts of the API, focus on "ATen" (~at~ namespace) and "Frontend" (~torch~ namespace).  Both have ~Tensor~, the ~at::Tensor~ lacks autograd API provided by ~torch::Tensor~.
 
 - [[https://pytorch.org/cppdocs/frontend.html][frontend]] :: The C++ "frontend" mimics the Python API 
 
-- [[https://pytorch.org/cppdocs/notes/tensor_basics.html][tensor basics]] :: 
+- [[https://pytorch.org/cppdocs/notes/tensor_basics.html][tensor basics]] :: Same tensor type for CPU or CUDA tensor and may have type double, float, int.  Code for accessesing individual tensor elements differ for CPU vs CUDA.  Use ~from_blob()~ to attach tensor to existing array data.  Scalar vs zero-dimensional TEnsor.
 
-- [[https://pytorch.org/cppdocs/api/namespace_at.html#namespace-at][=at::= namespace]] :: Low lever "tensor"
+- [[https://pytorch.org/cppdocs/api/namespace_at.html#namespace-at][=at::= namespace]] :: Low level "tensor" type and functions.
 
-Some entries to details:
-
-
-
-- https://pytorch.org/docs/stable/cpp_index.html
