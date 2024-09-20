@@ -5,5 +5,5 @@ using namespace WireCell;
 
 TEST_CASE("spng units") {
 
-    CHECK(units::cm == 1.0);
+    CHECK(units::mm == 1.0);
 }

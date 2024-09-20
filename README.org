@@ -14,7 +14,12 @@ $ ln -s ../spng .
 From then on we treat ~spng/~ as a normal WCT "subpackage", still in ~wire-cell-toolkit/~:
 
 #+begin_example
-$ ./wcb configure --prefix=$PREFIX --boost-mt --boost-libs=$PREFIX/lib --boost-include=$PREFIX/include --with-jsonnet-libs=gojsonnet 
+$ ./wcb configure --prefix=$PREFIX \
+    --boost-mt --boost-libs=$PREFIX/lib --boost-include=$PREFIX/include \
+    --with-jsonnet-libs=gojsonnet \
+    --with-cuda-lib=/usr/lib/x86_64-linux-gnu,$PREFIX/targets/x86_64-linux/lib \
+    --with-libtorch-lib=$PREFIX/lib/python3.11/site-packages/torch/lib \
+    --with-libtorch-include=$PREFIX/lib/python3.11/site-packages/torch/include
 $ ./wcb
 #+end_example
 

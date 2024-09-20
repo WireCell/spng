@@ -1,0 +1,30 @@
+#+title: Notes on use of Torch.
+
+This collects some notes on the use of Torch (C++ libtorch) to provide the basic array ("tensor") data structures and operations for spng.
+
+* Data context
+
+At low level one must utilize a ~torch::Device~.  WCT ~pytorch~ defines a ~TorchContext~ which couples this device with a semaphore for cooperatively limiting resource usage of the device.  The device object is otherwise just an identifier which can be produced from a name (string).  A tensor "knows" its device and can be moved to another device.
+
+
+* Tensor memory semantics
+
+- A ~torch::Tensor~ is [[https://discuss.pytorch.org/t/tensor-move-semantics-in-c-frontend/77901/10][like a shared pointer]].
+
+* Coding
+
+Torch is most popularly used via its Python bindings.  The C++ API is similar but the lack of popularity can make learning how to do things via internet search difficult.  The C++ documentation is fairly good.  These entry pages should be given a linear read through:
+
+- [[https://pytorch.org/cppdocs/][overview]] :: understand the major parts of the API, focus on "ATen" (~at~ namespace) and "Frontend" (~torch~ namespace).  Both have ~Tensor~, the ~at::Tensor~ lacks autograd API provided by ~torch::Tensor~.
+
+- [[https://pytorch.org/cppdocs/frontend.html][frontend]] :: The C++ "frontend" mimics the Python API 
+
+- [[https://pytorch.org/cppdocs/notes/tensor_basics.html][tensor basics]] :: 
+
+- [[https://pytorch.org/cppdocs/api/namespace_at.html#namespace-at][=at::= namespace]] :: Low lever "tensor"
+
+Some entries to details:
+
+
+
+- https://pytorch.org/docs/stable/cpp_index.html
