@@ -47,9 +47,25 @@ digraph idealistic {
     subgraph cluster_sp {
         label="Example SP subgraph"
 
+
+
+        subgraph cluster_inarrays {
+            label="Input Arrays"
+            node[shape=ellipse]
+            dc_fr[label="2D FR"]
+            dc_er[label="1D ER"]
+            dc_adc[label="ADC plane"]
+            dc_gaussf[label="Gauss filter"]
+            dc_wienerf[label="Wiener filter"]
+        }
+
         node[shape=ellipse]
-        dc_adc[label="ADC array"]
-        dc_adc_spec[label="ADC spectra"]
+        dc_fr_spec[label="2D FR spectrum"]
+        dc_er_spec[label="1D ER spectrum"]
+        dc_adc_spec[label="2D ADC spectra"]
+        dc_gaussf_spec[label="Gauss filter"]
+        dc_wienerf_spec[label="Wiener filter"]
+
         dc_gauss_spec[label="Gauss spectra"]
         dc_wiener_spec[label="Wiener spectra"]
         dc_gauss[label="Gauss decon"]
@@ -58,14 +74,42 @@ digraph idealistic {
         dc_signal[label="signal"]
         
         node[shape=box]
-        dc_gaussf[label="Gauss filter"]
-        dc_wienerf[label="Wiener filter"]
-        dc_fft[label="2D FFT"]
+        dc_gauss_fft[label="1D FFT"]
+        dc_wiener_fft[label="1D FFT"]
+        dc_gauss_decon[label="M*F/R"]
+        dc_wiener_decon[label="M*F/R"]
+        dc_er_fft[label="1D FFT"]
+        dc_fr_fft[label="2D FFT"]
+        dc_adc_fft[label="2D FFT"]
         dc_fftg[label="2D invFFT"]
         dc_fftw[label="2D invFFT"]
         dc_signal_roi[label="ROI finding"]
         dc_apply_roi[label="apply ROI"]
 
+        {rank=same dc_er_fft dc_fr_fft dc_adc_fft dc_gauss_fft dc_wiener_fft}
+
+        dc_adc->dc_adc_fft->dc_adc_spec
+        dc_fr->dc_fr_fft->dc_fr_spec
+        dc_er->dc_er_fft->dc_er_spec
+        dc_gaussf->dc_gauss_fft->dc_gaussf_spec
+        dc_wienerf->dc_wiener_fft->dc_wienerf_spec
+
+        dc_adc_spec->dc_gauss_decon
+        dc_er_spec->dc_gauss_decon
+        dc_fr_spec->dc_gauss_decon
+        dc_gaussf_spec->dc_gauss_decon
+
+        dc_gauss_decon->dc_gauss_spec
+
+        dc_adc_spec->dc_wiener_decon
+        dc_er_spec->dc_wiener_decon
+        dc_fr_spec->dc_wiener_decon
+        dc_wienerf_spec->dc_wiener_decon
+
+        dc_wiener_decon->dc_wiener_spec
+
+        dc_gauss_spec->dc_fftg->dc_gauss
+        dc_wiener_spec->dc_fftw->dc_wiener
 
         subgraph cluster_dnnroi {
             label="Incomplete DNNROI subgraph";
@@ -80,9 +124,7 @@ digraph idealistic {
             DNNROI->sigdnn
         }            
 
-        dc_adc->dc_fft->dc_adc_spec
-        dc_adc_spec->dc_gaussf->dc_gauss_spec->dc_fftg->dc_gauss
-        dc_adc_spec->dc_wienerf->dc_wiener_spec->dc_fftw->dc_wiener
+
         dc_wiener->dc_signal_roi->dc_roi->dc_apply_roi
         dc_gauss->dc_apply_roi->dc_signal
     }

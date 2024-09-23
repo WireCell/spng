@@ -28,3 +28,6 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 - [[https://pytorch.org/cppdocs/api/namespace_at.html#namespace-at][=at::= namespace]] :: Low level "tensor" type and functions.
 
+- ~torch::NoGradGuard~ :: this thread-local object turns off autograd.  It should be asserted at high level and sparingly.
+
+  
