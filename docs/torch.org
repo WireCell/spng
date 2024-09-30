@@ -1,6 +1,57 @@
 #+title: Notes on use of Torch.
 
-This collects some notes on the use of Torch (C++ libtorch) to provide the basic array ("tensor") data structures and operations for spng.
+This collects some notes on the use of the C++ API to PyTorch.
+
+* Names
+
+Rather confusingly:
+
+- PyTorch names the project at https://pytorch.org
+- This package [[https://stackoverflow.com/a/52708294][derives from Torch7]] 
+- ~torch~ names the Python API / package.
+- LibTorch names the C++ API, provided alone or with the ~torch~ Python package.
+- ~py-torch~ is the Spack package name for the Python ~torch~ package
+- ~pytorch~ is the name of the WCT subpackage that houses LibTorch-based DNN inference and FFT.
+- ~LIBTORCH~ is the WCT ~wcb~ environment label for building against a PyTorch installation.
+- ~--with--libtorch-*~ are WCT ~wcb~ command line args (which may point into the Python ~torch~ install area).
+
+WCT [[https://github.com/WireCell/wire-cell-toolkit/issues/343][Issue 343]] calls attention to this naming confusion and suggests using the name "torch" everywhere.  Here, we assume "torch" generically and state Python or C++ where it is not obvious.
+
+* Install and build problems
+
+** Include directories
+
+Using a few code distributions:
+
+- ~pip install torch~
+- ~libtorch-cxx11-abi-shared-with-deps-2.4.1+cu124.zip~
+- Spack build of ~py-torch-2.4.0~
+
+One would think an include location (~-I~) of this directory is needed:
+
+#+begin_example
+$TORCH_PREFIX/include
+#+end_example
+
+That fails to find the main entry header ~torch/torch.h~.  That and other important headers are in an unexpected, deeper directory:
+
+#+begin_example
+$TORCH_PREFIX/include/torch/csrc/api/include/torch/torch.h
+#+end_example
+
+Using *this* as a ~-I~ also fails as the first directory includes required headers included like ~#include <torch/HEADER.h>~.  To make matters more confused, some headers, like ~torch/script.h~, include paths like
+
+#+begin_example
+#include <torch/csrc/api/include/torch/types.h>
+#+end_example
+
+Given both directories as ~-I~ locations allows all headers to be found by the compiler.  Apparently this is an [[https://discuss.pytorch.org/t/where-to-find-torch-torch-h/59908][intentional wart]] that is buffed smooth if using Torch's CMake support.  For waf-heads, the weirdness is exposed.  Assuming ~TORCH_PREFIX~ points to the installation base directory then this will let WCT build against it.:
+
+#+begin_example
+waf  configure [...] \
+  --with-libtorch=$TORCH_PREFIX \
+  --with-libtorch-include=$TORCH_PREFIX/include,$TORCH_PREFIX/include/torch/csrc/api/include
+#+end_example
 
 * Data context
 
@@ -30,4 +81,19 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 - ~torch::NoGradGuard~ :: this thread-local object turns off autograd.  It should be asserted at high level and sparingly.
 
-  
+* Examples
+
+** Random
+
+#+begin_src c++
+  // uniform 1D
+  auto u1d = torch::rand({100});
+  // normal 1D
+  auto n1d = torch::randn({100});
+  // 2D
+  auto u2d = torch::rand({10, 100});  
+
+#+end_src
+
+** FFT
+
