@@ -44,24 +44,61 @@ digraph idealistic {
     af2frame->sigframe
 
 
+
+    subgraph cluster_response {
+        label="Prepare responses"
+        node[shape=ellipse]
+        fr_src[label="FR source"]
+        fr_plane[label="plane num"]
+        fr_raw[label="FR\npath vs step\n(126,1000), T=100ns\n(2D real, static)"]
+        fr_cooked[label="FR spec\nchan vs freq\n(21,250), T=500ns\n(2D complex, static)"]
+
+        er_src[label="ER source"]
+        er_wave[label="ER wave\n500ns, N_fr\n(1D real, static)"]
+        er_spec[label="ER spec\n(250,), T=500ns\n(1D complex, static)"]
+
+        dr_spec[label="DR\nchannel vs freq\n(21,250), T=500ns\n(2D complex, static)"]
+
+        pcr_src[label="PCR source"]
+        pcr_waves[label="PCR\n(N_ch=800,N_tick=6000), T=500ns\n(2D real, static)"]
+
+
+        node[shape=box]
+        fr_prep[label="FR prepare\nWire-region avg\n1D FFT in time\nN=4 rebin in freq"]
+
+        fr_load        
+        er_load[label="load(N_fr, T)"]
+        pcr_load
+
+        fr_plane->fr_load
+        fr_src->fr_load->fr_raw->fr_prep->fr_cooked
+        er_src->er_load->er_wave->er_fft->er_spec
+
+        fr_cooked->dr_mult
+        er_spec->dr_mult
+        dr_mult->dr_spec
+
+        fr_plane->pcr_load
+        pcr_src->pcr_load->pcr_waves->pcr_fft->pcr_specs
+
+    }
+
     subgraph cluster_sp {
         label="Example SP subgraph"
-
 
 
         subgraph cluster_inarrays {
             label="Input Arrays"
             node[shape=ellipse]
-            dc_fr[label="2D FR"]
-            dc_er[label="1D ER"]
+            dc_dr[label="Nominal DR\nrel. chan vs freq\n(small)"]
+            dc_per[label="Per-chan resp\nabs. chan vs freq\n(sparse)"]
             dc_adc[label="ADC plane"]
-            dc_gaussf[label="Gauss filter"]
-            dc_wienerf[label="Wiener filter"]
+            dc_gaussf[label="Gauss filter\n(1D wave)"]
+            dc_wienerf[label="Wiener filter\n(1D wave)"]
         }
 
         node[shape=ellipse]
-        dc_fr_spec[label="2D FR spectrum"]
-        dc_er_spec[label="1D ER spectrum"]
+
         dc_adc_spec[label="2D ADC spectra"]
         dc_gaussf_spec[label="Gauss filter"]
         dc_wienerf_spec[label="Wiener filter"]
@@ -78,32 +115,27 @@ digraph idealistic {
         dc_wiener_fft[label="1D FFT"]
         dc_gauss_decon[label="M*F/R"]
         dc_wiener_decon[label="M*F/R"]
-        dc_er_fft[label="1D FFT"]
-        dc_fr_fft[label="2D FFT"]
-        dc_adc_fft[label="2D FFT"]
+        dc_adc_fft_time[label="FFT time"]
         dc_fftg[label="2D invFFT"]
         dc_fftw[label="2D invFFT"]
         dc_signal_roi[label="ROI finding"]
         dc_apply_roi[label="apply ROI"]
 
-        {rank=same dc_er_fft dc_fr_fft dc_adc_fft dc_gauss_fft dc_wiener_fft}
+        {rank=same dc_adc_fft_time dc_gauss_fft dc_wiener_fft}
 
-        dc_adc->dc_adc_fft->dc_adc_spec
-        dc_fr->dc_fr_fft->dc_fr_spec
-        dc_er->dc_er_fft->dc_er_spec
+        dc_adc->dc_adc_fft_time->dc_adc_spec
+
         dc_gaussf->dc_gauss_fft->dc_gaussf_spec
         dc_wienerf->dc_wiener_fft->dc_wienerf_spec
 
+        dc_dr->dc_gauss_decon
         dc_adc_spec->dc_gauss_decon
-        dc_er_spec->dc_gauss_decon
-        dc_fr_spec->dc_gauss_decon
         dc_gaussf_spec->dc_gauss_decon
 
         dc_gauss_decon->dc_gauss_spec
 
+        dc_dr->dc_wiener_decon
         dc_adc_spec->dc_wiener_decon
-        dc_er_spec->dc_wiener_decon
-        dc_fr_spec->dc_wiener_decon
         dc_wienerf_spec->dc_wiener_decon
 
         dc_wiener_decon->dc_wiener_spec
