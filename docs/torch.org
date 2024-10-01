@@ -53,6 +53,17 @@ waf  configure [...] \
   --with-libtorch-include=$TORCH_PREFIX/include,$TORCH_PREFIX/include/torch/csrc/api/include
 #+end_example
 
+
+**  Warning about arguments to variadic macro
+
+You may see many warnings from inside torch code like:
+
+#+begin_example
+warning: ISO C++11 requires at least one argument for the "..." in a variadic macro
+#+end_example
+
+As far as I can tell these can only be disabled by removing ~-pedantic~.
+
 * Data context
 
 At low level one must utilize a ~torch::Device~.  WCT ~pytorch~ defines a ~TorchContext~ which couples this device with a semaphore for cooperatively limiting resource usage of the device.  The device object is otherwise just an identifier which can be produced from a name (string).  A tensor "knows" its device and can be moved to another device.
@@ -67,7 +78,7 @@ At low level one must utilize a ~torch::Device~.  WCT ~pytorch~ defines a ~Torch
 - ~torch::Tensor::clone()~ makes a new tensor holding a copy of of the tensor.  See also ~torch::clone()~.
 
 
-* Coding
+* Documentation
 
 Torch is most popularly used via its Python bindings.  The C++ API is similar but the lack of popularity can make learning how to do things via internet search difficult.  The C++ documentation is fairly good.  These entry pages should be given a linear read through.  Here are some with brief topic summaries:
 
@@ -83,6 +94,10 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 * Examples
 
+- tensor shape :: use ~tensor::sizes()~
+- indexing :: see https://pytorch.org/cppdocs/notes/tensor_indexing.html must pass ~{...}~ of indices, even if 1D, this yields yet another tensor.
+- accessing :: https://pytorch.org/cppdocs/notes/tensor_basics.html to get tensor elements as C++ POD 
+
 ** Random
 
 #+begin_src c++
@@ -96,4 +111,20 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 #+end_src
 
 ** FFT
+
+* Performance testing
+
+#+begin_example
+$ ./build/spng/wcdoctest-spng -t "spng torch conv"
+$ OMP_NUM_THREADS=1 ./build/spng/wcdoctest-spng -t "spng torch conv"
+#+end_example
+
+That test exercises some large 1D and 2D tensor FFT and multiplications many times on CPU and GPU for a 1k x 10k array shape.  The second command limits torch to using 1 CPU core.  Testing 100k loops gives very curious results.  Listing XXXa where XXX is CPU or GPU utilization and "a" is the phase (c = tensors on CPU, g = tensors on GPU).  Utilization is checked by ~top -d1~ and ~nvidia-smi -l1~.  Time t is wall clock.  Both CPU and GPU RAM utilization is about 450 MB.
+
+| cores |  CPUc | GPUc |  CPUg | GPUg | CPU t   | GPU t    |
+|-------+-------+------+-------+------+---------+----------|
+|     1 |  100% |   0% |  100% |  44% | 3930 ms | 12146 ms |
+|    32 | 3200% |   0% | 3200% |  44% | 4921 ms | 12132 ms |
+|-------+-------+------+-------+------+---------+----------|
+
 
