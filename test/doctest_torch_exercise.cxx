@@ -147,18 +147,31 @@ TEST_CASE("spng torch convo") {
     torch::Device gpu(torch::kCUDA);
     test_spng_torch_convo(gpu);
     
-    std::vector<long int> big = {1000,10000};
     quiet = true;
     TimeKeeper tk("spng torch convo speed test");
     const size_t tries = 100000;
+
+    std::vector<long int> big = {1000,10000};
     for (size_t ind=0; ind<tries; ++ind) {
         test_spng_torch_convo(cpu);
     }
-    tk("cpu");
+    tk("cpu 10^3 x 10^4");
     for (size_t ind=0; ind<tries; ++ind) {
         test_spng_torch_convo(gpu);
     }
-    tk("gpu");
+    tk("gpu 10^3 x 10^4");
+
+    std::vector<long int> big2 = {1024,8192};
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo(cpu);
+    }
+    tk("cpu 2^10 x 2^13");
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo(gpu);
+    }
+    tk("gpu 2^10 x 2^13");
+
+
     std::cerr << tk.summary() << "\n";
 
 }
