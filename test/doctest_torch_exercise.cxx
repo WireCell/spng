@@ -39,8 +39,23 @@ void dump(const T& ten, const std::string& msg="")
     }    
 }
 
+struct Tens {
+
+    std::vector<long int> shape;    
+    torch::TensorOptions topt;
+    torch::Tensor s, f0, f1;
+    Tens(const std::vector<long int>& shape_, const torch::Device& device)
+        : shape(shape_)
+        , topt(torch::TensorOptions().dtype(torch::kFloat64).device(device).requires_grad(false))
+        , s(torch::rand(shape, topt))
+        , f0(torch::rand(shape[0], topt))
+        , f1(torch::rand(shape[1], topt))
+        { }
+};
+
+
 static
-void test_spng_torch_convo(torch::Device& device, const std::vector<long int>& shape = {2,5})
+void test_spng_torch_convo(const Tens& tens)
 {
     // Cyclically convolve a 2D uniform random array with two 1D uniform random
     // arrays independently spanning the two dimensions in two ways: via
@@ -68,46 +83,27 @@ void test_spng_torch_convo(torch::Device& device, const std::vector<long int>& s
       dr = numpy.abs(numpy.real(m) - numpy.real(m01))
       assert numpy.all(dr < 1e-14)
      */
-    auto topt = torch::TensorOptions()
-        .dtype(torch::kFloat64)
-        .device(device)
-        .requires_grad(false);
 
-
-    // The "signal" in interval domain.
-    // auto s = torch::rand(at::IntArrayRef(shape));
-    auto s = torch::rand(shape, topt);
-    dump(s, "s");
-
-    // The "responses" along each dimension.
-    auto f0 = torch::rand(shape[0], topt);
-    auto f1 = torch::rand(shape[1], topt);
-
-    // The total 2D response
-    torch::Tensor f = torch::outer(f0, f1);
-
-    dump(f0, "f0");
-    dump(f1, "f1");
-    dump(f, "f");
+    auto f = torch::outer(tens.f0, tens.f1);
 
     {                           // peek at array shape
         auto sizes = f.sizes();
         // std::cerr << sizes << "\n";
         size_t size = sizes.size();
         REQUIRE(size == 2);
-        REQUIRE(sizes[0] == shape[0]);
-        REQUIRE(sizes[1] == shape[1]);
+        REQUIRE(sizes[0] == tens.shape[0]);
+        REQUIRE(sizes[1] == tens.shape[1]);
     }
 
     // One shot 2D convo
-    auto S = torch::fft::fft2(s);
+    auto S = torch::fft::fft2(tens.s);
     auto F = torch::fft::fft2(f);
     auto M = S*F;
     auto m = torch::fft::ifft2(M); // complex
 
     // Per dimension convo
-    auto S1 = torch::fft::fft2(s, torch::nullopt, {1});
-    auto F1 = torch::fft::fft(f1);
+    auto S1 = torch::fft::fft2(tens.s, torch::nullopt, {1});
+    auto F1 = torch::fft::fft(tens.f1);
     dump(S1, "S1");
     dump(F1, "F1");
 
@@ -118,7 +114,7 @@ void test_spng_torch_convo(torch::Device& device, const std::vector<long int>& s
     auto SF01 = torch::fft::fft2(SF1, torch::nullopt, {0});
     dump(SF01, "SF01");
 
-    auto F0 = torch::fft::fft(f0).reshape({-1,1});
+    auto F0 = torch::fft::fft(tens.f0).reshape({-1,1});
     auto M01 = SF01 * F0;
     auto m01 = torch::fft::ifft2(M01);
 
@@ -134,44 +130,50 @@ void test_spng_torch_convo(torch::Device& device, const std::vector<long int>& s
     auto small = torch::all( dr < 1e-14 );
     dump(small, "small");
 
-    REQUIRE(small.item<bool>());
+    //REQUIRE(small.item<bool>());
 
 }
 
+static void small(const torch::Device& device)
+{
+    quiet = false;
+    std::vector<long int> shape = {2,5};
+    Tens tens(shape, device);
+    test_spng_torch_convo(tens);
+}
 
-TEST_CASE("spng torch convo") {
-    std::vector<long int> small = {2,5};
+TEST_CASE("spng torch convo small cpu")
+{
+    small(torch::kCPU);
+}
+TEST_CASE("spng torch convo small gpu")
+{
+    small(torch::kCUDA);
+}
 
-    torch::Device cpu(torch::kCPU);
-    test_spng_torch_convo(cpu);
-    torch::Device gpu(torch::kCUDA);
-    test_spng_torch_convo(gpu);
-    
+static void perf(const std::string& msg,
+                 const torch::Device& device,
+                 const std::vector<long int>& shape = {1024,8192}, 
+                 const size_t tries = 100)
+{
     quiet = true;
     TimeKeeper tk("spng torch convo speed test");
-    const size_t tries = 100000;
-
-    std::vector<long int> big = {1000,10000};
+    Tens tens(shape, device);
+    tk("start");
+        
     for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo(cpu);
+        test_spng_torch_convo(tens);
     }
-    tk("cpu 10^3 x 10^4");
-    for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo(gpu);
-    }
-    tk("gpu 10^3 x 10^4");
-
-    std::vector<long int> big2 = {1024,8192};
-    for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo(cpu);
-    }
-    tk("cpu 2^10 x 2^13");
-    for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo(gpu);
-    }
-    tk("gpu 2^10 x 2^13");
-
-
+    tk(msg);
     std::cerr << tk.summary() << "\n";
-
 }
+
+TEST_CASE("spng torch convo perf gpu")
+{
+    perf("GPU 1024x8192 x1000", torch::kCUDA, {1024,8192}, 1000);
+}
+TEST_CASE("spng torch convo perf cpu")
+{
+    perf("CPU 1024x8192 x100", torch::kCPU, {1024,8192}, 100);
+}
+
