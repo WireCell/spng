@@ -55,7 +55,7 @@ struct Tens {
 
 
 static
-void test_spng_torch_convo(const Tens& tens)
+void test_spng_torch_convo(const Tens& tens, bool smallness_checks=false)
 {
     // Cyclically convolve a 2D uniform random array with two 1D uniform random
     // arrays independently spanning the two dimensions in two ways: via
@@ -125,13 +125,21 @@ void test_spng_torch_convo(const Tens& tens)
     auto m01_i = torch::imag(m01);
     dump(m01, "m01");
 
-    auto dr = torch::abs(m_r - m01_r);
-    dump(dr, "dr");
-    auto small = torch::all( dr < 1e-14 );
-    dump(small, "small");
+    if (smallness_checks) {
+        auto im = torch::max(torch::abs(m_i)).item<double>();
+        auto im_01 = torch::max(torch::abs(m01_i)).item<double>();
+        REQUIRE(im < 1e-12);
+        REQUIRE(im_01 < 1e-12);
+        auto dr = torch::abs(m - m01);
+        auto dr_max = torch::max(dr).item<double>();
+        REQUIRE(dr_max < 1e-8);
 
-    //REQUIRE(small.item<bool>());
+        dump(dr, "dr");
+        auto small = torch::all( dr < 1e-8 );
+        dump(small, "small");
 
+        REQUIRE(small.item<bool>());
+    }
 }
 
 static void small(const torch::Device& device)
@@ -139,7 +147,7 @@ static void small(const torch::Device& device)
     quiet = false;
     std::vector<long int> shape = {2,5};
     Tens tens(shape, device);
-    test_spng_torch_convo(tens);
+    test_spng_torch_convo(tens, true);
 }
 
 TEST_CASE("spng torch convo small cpu")
