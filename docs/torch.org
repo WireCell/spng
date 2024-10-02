@@ -117,36 +117,41 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 
 #+begin_example
+$ ./build/spng/wcdoctest-spng -tc="spng torch convo small*"
 $ OMP_NUM_THREADS=1  ./build/spng/wcdoctest-spng -tc="spng torch convo perf*"
 $ OMP_NUM_THREADS=32 ./build/spng/wcdoctest-spng -tc="spng torch convo perf*"
 #+end_example
 
 These tests:
 - Does a 1-shot 2D FFT convolution and the same convo as two 1D, per-dimension FFT convolutions.
-- Use array shape 1024 x 8192 powers of 2 near real detector readout sizes.
-- 1000 calls to the alg a single call to ~torch::rand()~ for the initial arrays.
-- Limit number of CPU threads, confirm CPU and GPU utilization with ~top~ and ~nvidia-smi~
+- The "convo small" uses a small array and prints various results.
+- Teh "convo perf" uses array shape 1024 x 8192 and not printing and runs it many times.
+- 1000 calls to the alg on GPU, 100 on CPU. A single call to ~torch::rand()~ used for all calls.
+- Use env. var. to limit number of CPU threads, confirm CPU and GPU utilization with ~top~ and ~nvidia-smi~
 
   Results:
 
-| threads | device | wall clock | ncalls |   CPU |  GPU | CPU mem | GPU mem |
-|---------+--------+------------+--------+-------+------+---------+---------|
-|      32 | GPU    | 10.4 s     |   1000 |  100% | 100% |     0.5 |     1.9 |
-|       1 | GPU    | 10.4 s     |   1000 |  100% | 100% |     0.5 |     1.9 |
-|      32 | CPU    | 9.47 s     |    100 | 3200% |   0% | 0.5-1.4 |       0 |
-|      16 | CPU    | 11.45 s    |    100 | 1600% |   0% |         |         |
-|       8 | CPU    | 16.91 s    |    100 |  800% |   0% |         |         |
-|       4 | CPU    | 28.65 s    |    100 |  400% |   0% |         |         |
-|       2 | CPU    | 53.07 s    |    100 |  200% |   0% |         |         |
-|       1 | CPU    | 122.4      |    100 |  100% |   0% |         |         |
-|       1 | CPU    | 12.3s      |     10 |  100% |   0% | 0.7-1.6 |       0 |
+|    | threads | device | time   | ncalls |   CPU |  GPU | CPU mem | GPU mem |
+|----+---------+--------+--------+--------+-------+------+---------+---------|
+|  1 |      32 | GPU    | 9.5 s  |   1000 |  100% | 100% |     0.5 |     1.9 |
+|  2 |       1 | GPU    | 9.5 s  |   1000 |  100% | 100% |     0.5 |     1.9 |
+|  3 |      32 | CPU    | 9.5 s  |    100 | 3200% |   0% | 0.5-1.4 |       0 |
+|  4 |      16 | CPU    | 11.5 s |    100 | 1600% |   0% |         |         |
+|  5 |       8 | CPU    | 16.9 s |    100 |  800% |   0% |         |         |
+|  6 |       4 | CPU    | 28.7 s |    100 |  400% |   0% |         |         |
+|  7 |       2 | CPU    | 53.1 s |    100 |  200% |   0% |         |         |
+|  8 |       1 | CPU    | 122.4  |    100 |  100% |   0% |         |         |
+|  9 |       1 | CPU    | 12.3s  |     10 |  100% |   0% | 0.7-1.6 |       0 |
+| 10 |      32 | GPU    | 12.1   |   1000 |       |      |         |         |
 
+Notes:
+10. [@10] Turn on checks for small imaginary parts and differences between the two convo methods.
 
 Observations:
 
 - Running on GPU needs only, and all of, one CPU core.
 
-- GPU is two orders of magnitude faster than one core and one order faster than one 32 core CPU.
+- GPU is two orders of magnitude faster than one core and (almost exactly!) one order faster to full 32 core CPU.
 
 - A lot of CPU memory fluctuation when running on CPU.
 
@@ -154,4 +159,30 @@ Observations:
 
 - GPU mem is higher than CPU mem (when running on CPU) but this may represent a high water mark.
 
-- CPU gives less than linear scaling with number of cores.  
+- CPU gives less than linear scaling with number of cores.
+
+- Setting ~OMP_NUM_THREADS=64~ gives no changes.  I guess OMP does not use hyper-threading?
+
+
+* [3/11] TO DO
+- [X] Filtered deconvolution kernel design
+- [X] A test with basic torch operations and performance related to decon
+- [X] Factor this into functional library code
+  - ~Torch::convo_spec()~ and others in ~Util.h~.
+
+- [ ] Reconcile what utility code should live in ~spng/~ or ~pytorch/~
+
+- [ ] Function to convert ~Response::Schema::FieldResponse~ into tensors
+
+- [ ] Function to sample / convert ER, RC to tensor.
+
+- [ ] Function to convert per-chan-response to tensor.
+
+- [ ] Function to convert ~IFrame~ into tensors.
+
+- [ ] New ~IData~ to hold a torch tensor. (NOT an ~ITensor~)
+
+- [ ] New ~INode~'s pass this new ~IData~.
+
+- [ ] Functions to produce above type tensors direct from data for test/dev purposes.
+
