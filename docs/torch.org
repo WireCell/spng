@@ -164,7 +164,7 @@ Observations:
 - Setting ~OMP_NUM_THREADS=64~ gives no changes.  I guess OMP does not use hyper-threading?
 
 
-* [3/11] TO DO
+* [3/7] TO DO
 - [X] Filtered deconvolution kernel design
 - [X] A test with basic torch operations and performance related to decon
 - [X] Factor this into functional library code
@@ -172,17 +172,23 @@ Observations:
 
 - [ ] Reconcile what utility code should live in ~spng/~ or ~pytorch/~
 
-- [ ] Function to convert ~Response::Schema::FieldResponse~ into tensors
+- [-] converters between torch and non-torch data types
+  - [ ] Eigen and ~std::vector~
+    - perhaps to trivial to make explicit given ~torch::from_blob()~
+  - [ ] ~Response::Schema~
 
-- [ ] Function to sample / convert ER, RC to tensor.
+    - ~Array::array_xxf as_array(const Schema::PlaneResponse& pr);~
 
-- [ ] Function to convert per-chan-response to tensor.
+  - [ ] Sample and convert ER, RC
 
-- [ ] Function to convert ~IFrame~ into tensors.
+  - [-] IFrame to tensor
+
+    - [X] Like ~Aux::FrameTools::raster~ 
+    - [ ] Include face-padding/unpadding option
+
+  - [ ] Direct from file for dev/test
 
 - [ ] New ~IData~ to hold a torch tensor. (NOT an ~ITensor~)
 
 - [ ] New ~INode~'s pass this new ~IData~.
-
-- [ ] Functions to produce above type tensors direct from data for test/dev purposes.
 
