@@ -114,17 +114,44 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 * Performance testing
 
+
+
 #+begin_example
-$ ./build/spng/wcdoctest-spng -t "spng torch conv"
-$ OMP_NUM_THREADS=1 ./build/spng/wcdoctest-spng -t "spng torch conv"
+$ OMP_NUM_THREADS=1  ./build/spng/wcdoctest-spng -tc="spng torch convo perf*"
+$ OMP_NUM_THREADS=32 ./build/spng/wcdoctest-spng -tc="spng torch convo perf*"
 #+end_example
 
-That test exercises some large 1D and 2D tensor FFT and multiplications many times on CPU and GPU for a 1k x 10k array shape.  The second command limits torch to using 1 CPU core.  Testing 100k loops gives very curious results.  Listing XXXa where XXX is CPU or GPU utilization and "a" is the phase (c = tensors on CPU, g = tensors on GPU).  Utilization is checked by ~top -d1~ and ~nvidia-smi -l1~.  Time t is wall clock.  Both CPU and GPU RAM utilization is about 450 MB.
+These tests:
+- Does a 1-shot 2D FFT convolution and the same convo as two 1D, per-dimension FFT convolutions.
+- Use array shape 1024 x 8192 powers of 2 near real detector readout sizes.
+- 1000 calls to the alg a single call to ~torch::rand()~ for the initial arrays.
+- Limit number of CPU threads, confirm CPU and GPU utilization with ~top~ and ~nvidia-smi~
 
-| cores |  CPUc | GPUc |  CPUg | GPUg | CPU t   | GPU t    |
-|-------+-------+------+-------+------+---------+----------|
-|     1 |  100% |   0% |  100% |  44% | 3930 ms | 12146 ms |
-|    32 | 3200% |   0% | 3200% |  44% | 4921 ms | 12132 ms |
-|-------+-------+------+-------+------+---------+----------|
+  Results:
+
+| threads | device | wall clock | ncalls |   CPU |  GPU | CPU mem | GPU mem |
+|---------+--------+------------+--------+-------+------+---------+---------|
+|      32 | GPU    | 10.4 s     |   1000 |  100% | 100% |     0.5 |     1.9 |
+|       1 | GPU    | 10.4 s     |   1000 |  100% | 100% |     0.5 |     1.9 |
+|      32 | CPU    | 9.47 s     |    100 | 3200% |   0% | 0.5-1.4 |       0 |
+|      16 | CPU    | 11.45 s    |    100 | 1600% |   0% |         |         |
+|       8 | CPU    | 16.91 s    |    100 |  800% |   0% |         |         |
+|       4 | CPU    | 28.65 s    |    100 |  400% |   0% |         |         |
+|       2 | CPU    | 53.07 s    |    100 |  200% |   0% |         |         |
+|       1 | CPU    | 122.4      |    100 |  100% |   0% |         |         |
+|       1 | CPU    | 12.3s      |     10 |  100% |   0% | 0.7-1.6 |       0 |
 
 
+Observations:
+
+- Running on GPU needs only, and all of, one CPU core.
+
+- GPU is two orders of magnitude faster than one core and one order faster than one 32 core CPU.
+
+- A lot of CPU memory fluctuation when running on CPU.
+
+- No CPU mem fluctuation when running on GPU.
+
+- GPU mem is higher than CPU mem (when running on CPU) but this may represent a high water mark.
+
+- CPU gives less than linear scaling with number of cores.  

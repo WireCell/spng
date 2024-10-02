@@ -1,5 +1,16 @@
 #+title: Idealistic SPNG flow
 
+* meta :noexport:
+
+#+begin_src sh :results output drawer
+scp idealistic.* hierocles.phy.bnl.gov:public_html/wire-cell/docs/spng/
+#+end_src
+
+#+RESULTS:
+:results:
+:end:
+
+
 * Overview
 
 SPNG, like the original SP (Wire-Cell Toolkit's ~OmnibusSigProc~) has two major stages of processing
@@ -9,6 +20,24 @@ SPNG, like the original SP (Wire-Cell Toolkit's ~OmnibusSigProc~) has two major 
 - signal regions of interest :: adaptive time-domain filters are applied to mitigate unregulated noise that is amplified by the deconvolution.
 
 * Filtered deconvolution
+
+** tl;dr
+
+The decon is described in details starting in the next section.  Assuming that is already understood, the basic jist is that the calculation is performed in a monolithic way:
+
+- Transform any 1D array to
+  - The "time" and "wire" filters form 2D via their outer product.
+  - 1D (eg, nominal ER vs tick) is replicated over the other dimension.
+- Add the total sizes of all arrays along each dimension.
+- Pad all arrays to that size to allow for cyclic DFT safety (inc. face-edge padding if needed).
+- Calculate a "total Gauss" and a "total Wiener" kernel including filters and all responses.
+- Apply DFT and hold on to these two kernels as 2D spectra.
+- Apply DFT to a similarly padded 2D ADC array
+- Multiply in 2D Fourier and invDFT back to interval.
+- Save / add tails via "overlap-add" in chunked-streamed mode.
+
+
+** Basics
 
 The measurement $M$ from a detector that responds as $R$ to true signal $S_{true}$ and which has untreated $\mathcal{N}$ is modeled as
 
