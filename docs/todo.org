@@ -4,7 +4,7 @@ This an incomplete and ever changing set of todo items for SPNG.
 
 * [0/0] Array library 
 
-- [0/5] Evaluate ArrayFire to compare to LibTorch
+- [0/5] Evaluate ArrayFire to compare to LibTorch (jc)
   - [ ] Implement equivalent to [[file:../test/doctest_torch_exercise.cxx]] 
   - [ ] Understand the AF memory model (shared pointer like?  whole object? - I think latter)
   - [ ] Understand how to hand off AF array to an ~IData~, ideally with no copy.
@@ -15,13 +15,13 @@ This an incomplete and ever changing set of todo items for SPNG.
 
 The "filtered decon" is really a convolution with a single "kernel" array.
 
-- [3/3] Develop LibTorch based kernel
+- [3/3] Develop LibTorch based kernel (bv)
   - [X] Filtered deconvolution kernel design
   - [X] A test with basic torch operations and performance related to decon
   - [X] Factor this into functional library code
     - ~Torch::convo_spec()~ and others in ~Util.h~.
 
-* [1/5] Data converters.
+* [1/5] Data converters (bv/jc)
 
 This assumes LibTorch choice and progress can be made on the list independent of AF vs LT choice as the code should easily be refactored to support ArrayFire.
 
@@ -46,7 +46,7 @@ This assumes LibTorch choice and progress can be made on the list independent of
   - [ ] Assemble the filter and response ingredients that are passed to the overall convolution "kernel" builder.
   - [ ] A face-padding/unpadding function to avoid wrap-around/bleed-over artifacts on non-cyclic wire planes.
 
-* [0/3] Code organization
+* [0/3] Code organization (bv)
   - [ ] Rename ~pytorch/~ to ~torch/~ and related ([[https://github.com/WireCell/wire-cell-toolkit/issues/343][Issue 343]], hyu is on board).
   - [ ] Branch WCT to include ~spng/~ as sub-package.
   - [ ] Reconcile what utility code should live in ~spng/~ or ~pytorch/~
