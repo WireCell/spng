@@ -11,11 +11,10 @@ This an incomplete and ever changing set of todo items for SPNG.
   - [ ] Does AF allow for const correctness (I think yes).
   - [ ] Develop a story for supporting DNNROI inference in AF-based SPNG (does AF directly support torch script?  Is there a way to convert TS file to something AF loads?  Would we require DNNROI training to dump model in something besides TS? Does [[https://onnx.ai/][Onnx]] have a role?)
 
-* [/] Convolution kernel
+* [3/3] Convolution kernel (bv)
 
 The "filtered decon" is really a convolution with a single "kernel" array.
 
-- [3/3] Develop LibTorch based kernel (bv)
   - [X] Filtered deconvolution kernel design
   - [X] A test with basic torch operations and performance related to decon
   - [X] Factor this into functional library code
