@@ -2,6 +2,19 @@
 
 This collects some notes on the use of the C++ API to PyTorch.
 
+* meta :noexport:
+
+
+#+begin_src sh :results output drawer
+scp torch.html hierocles.phy.bnl.gov:public_html/wire-cell/docs/spng/torch.html
+#+end_src
+
+#+RESULTS:
+:results:
+torch.html                                      0%    0     0.0KB/s   --:-- ETAtorch.html                                    100%   26KB  11.4MB/s   00:00    
+:end:
+
+
 * Names
 
 Rather confusingly:
@@ -64,6 +77,7 @@ warning: ISO C++11 requires at least one argument for the "..." in a variadic ma
 
 As far as I can tell these can only be disabled by removing ~-pedantic~.
 
+
 * Data context
 
 At low level one must utilize a ~torch::Device~.  WCT ~pytorch~ defines a ~TorchContext~ which couples this device with a semaphore for cooperatively limiting resource usage of the device.  The device object is otherwise just an identifier which can be produced from a name (string).  A tensor "knows" its device and can be moved to another device.
@@ -71,11 +85,16 @@ At low level one must utilize a ~torch::Device~.  WCT ~pytorch~ defines a ~Torch
 
 * Tensor memory semantics
 
-- A ~torch::Tensor~ is [[https://discuss.pytorch.org/t/tensor-move-semantics-in-c-frontend/77901/10][like a shared pointer]].
+- A ~torch::Tensor~ is [[https://discuss.pytorch.org/t/tensor-move-semantics-in-c-frontend/77901/10][like a shared pointer]] which has some important implications:
+
+  - Pass-by-value is fine for ~torch::Tensor~.  There is little benefit to pass by reference and never hold a tensor by bare pointer.
+
+  - Somewhat surprisingly, ~const torch::Tensor~ does *not* make the underlying tensor data ~const~.  The names of methods that "mutate" the tensor end in underscore and yet are ~const~ (eg ~torch::Tensor::zero_() const~).  See [[https://github.com/zdevito/ATen/issues/27#issuecomment-330717839][this comment]] for explanation.  The only way to assure the underlying data is treated as "const" is self restraint.
 
 - ~torch::Tensor::detach()~ disconnects the tensor from autograd
 
 - ~torch::Tensor::clone()~ makes a new tensor holding a copy of of the tensor.  See also ~torch::clone()~.
+
 
 
 * Documentation
@@ -92,29 +111,17 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 - ~torch::NoGradGuard~ :: this thread-local object turns off autograd.  It should be asserted at high level and sparingly.
 
+
 * Examples
 
 - tensor shape :: use ~tensor::sizes()~
 - indexing :: see https://pytorch.org/cppdocs/notes/tensor_indexing.html must pass ~{...}~ of indices, even if 1D, this yields yet another tensor.
 - accessing :: https://pytorch.org/cppdocs/notes/tensor_basics.html to get tensor elements as C++ POD 
 
-** Random
+  See also [[file:../test/]].
 
-#+begin_src c++
-  // uniform 1D
-  auto u1d = torch::rand({100});
-  // normal 1D
-  auto n1d = torch::randn({100});
-  // 2D
-  auto u2d = torch::rand({10, 100});  
-
-#+end_src
-
-** FFT
 
 * Performance testing
-
-
 
 #+begin_example
 $ ./build/spng/wcdoctest-spng -tc="spng torch convo small*"
@@ -164,31 +171,24 @@ Observations:
 - Setting ~OMP_NUM_THREADS=64~ gives no changes.  I guess OMP does not use hyper-threading?
 
 
-* [3/7] TO DO
-- [X] Filtered deconvolution kernel design
-- [X] A test with basic torch operations and performance related to decon
-- [X] Factor this into functional library code
-  - ~Torch::convo_spec()~ and others in ~Util.h~.
+* Exchanging tensors between WCT data flow graph nodes
 
-- [ ] Reconcile what utility code should live in ~spng/~ or ~pytorch/~
+WCT ~IData~ and ~INode~ interface classes must be developed to allow transfer of tensors across the DFP graph edges.  Before designing these interfaces a number of problematic decisions are needed due to the facts:
 
-- [-] converters between torch and non-torch data types
-  - [ ] Eigen and ~std::vector~
-    - perhaps to trivial to make explicit given ~torch::from_blob()~
-  - [ ] ~Response::Schema~
+1. Tensors are type free (at C++ level) or in other words they are dynamically typed.
+2. An unknown and likely large variety in the number and meaning of tensors must be supported at the input/output of the relevant ~INode~.
+3. It is (apparently) impossible for C++ to assert const correctness of tensor data.
+4. We explicitly want to avoid copying tensor data.
 
-    - ~Array::array_xxf as_array(const Schema::PlaneResponse& pr);~
+The first two could be covered by reflecting the variety in the ~IData~ and ~INode~ mid-hierarchy interfaces.  This would convert type-free ~torch::Tensor~ into C++ types.  But, it would require defining new ~IData~ and ~INode~ for every variant.
 
-  - [ ] Sample and convert ER, RC
+A better (lazier) approach is perhaps to mimic the ~ITensor/ITensorSet~ replacing the method returning a ~std::byte*~ data representation and the associated retyping methods in ~ITensor~ with a single ~torch::Tensor tensor()~ method. These new ~IData~ interface classes must inherently depend on ~torch/torch.h~ and so they can not live in ~iface/~ but must be in ~spng/~ or better ~pytorch/~.
 
-  - [-] IFrame to tensor
+A small proliferation in ~INode~ types is still required at the input and output of the subgraph that deals in tensors.  Eg, an ~IFrameTorchTensor~ and an ~ITorchTensorFrame~ converter on input/output is needed.
 
-    - [X] Like ~Aux::FrameTools::raster~ 
-    - [ ] Include face-padding/unpadding option
+The need for and inability to enforce const-ness at the C++ level requires that WCT rely on *contract*.  That is, developers simply must not write code that modifies any tensor taken from an ~IData~.
 
-  - [ ] Direct from file for dev/test
 
-- [ ] New ~IData~ to hold a torch tensor. (NOT an ~ITensor~)
 
-- [ ] New ~INode~'s pass this new ~IData~.
+
 
