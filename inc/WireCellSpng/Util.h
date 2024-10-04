@@ -12,6 +12,18 @@
 // Capitalized "Torch" namespace should not collide with any in torch, proper.
 namespace WireCell::Torch {
 
+    // All tensors here are 2D unless indicated otherwise.
+
+
+    // Return 2D tensor of shape with ten filling lower corner and remaining
+    // elements holding the given value.
+    torch::Tensor pad(torch::Tensor ten, double value, torch::IntArrayRef shape);
+
+    // Return a sampled, normalized 1D Gausian pdf.
+    torch::Tensor gaussian1d(double mean, double sigma,
+                             int npoints, double xmin, double xmax,
+                             torch::TensorOptions options = torch::TensorOptions());
+
     // Return a shape large enough to assure linear convolution if the given
     // tensors and another tensor of shape extra_shape were cyclically
     // convolved.

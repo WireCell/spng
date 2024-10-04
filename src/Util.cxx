@@ -1,5 +1,17 @@
 #include "WireCellSpng/Util.h"
+#include <cmath>
 using namespace WireCell;
+
+torch::Tensor Torch::gaussian1d(double mean, double sigma,
+                                int npoints, double xmin, double xmax,
+                                torch::TensorOptions options)
+{
+    auto x = torch::linspace(xmin, xmax, npoints, options);
+    auto rel = (x - mean)/sigma;
+    const double norm = sqrt(2*M_PI*sigma*sigma);
+    return norm * torch::exp(-0.5*rel*rel);
+}
+
 
 std::vector<int64_t> Torch::linear_shape(const std::vector<torch::Tensor>& tens, 
                                          torch::IntArrayRef extra_shape)
@@ -15,6 +27,19 @@ std::vector<int64_t> Torch::linear_shape(const std::vector<torch::Tensor>& tens,
 }
 
 
+torch::Tensor Torch::pad(torch::Tensor ten, double value, torch::IntArrayRef shape)
+{
+    using torch::indexing::Slice;
+
+    torch::Tensor padded = torch::zeros(shape, ten.options()) + value;
+    auto s = ten.sizes();
+    padded.index_put_({
+            Slice(0,std::min(s[0], shape[0])),
+            Slice(0,std::min(s[1], shape[1]))
+        }, ten);
+    return padded;    
+}
+
 torch::Tensor Torch::convo_spec(const std::vector<torch::Tensor>& tens, 
                                 torch::IntArrayRef shape)
 {
@@ -29,12 +54,15 @@ torch::Tensor Torch::convo_spec(const std::vector<torch::Tensor>& tens,
 
     // First, accumulate denominator.
     for (size_t ind=0; ind<ntens; ++ind) {
-        // FIXME: zero padding is not always appropriate
+        // Caveat: zero-padding is not always appropriate for every ten in tens.
         interval.zero_();
 
         const auto& ten = tens[ind];
-        auto sizes = ten.sizes();
-        interval.index_put_({Slice(0,sizes[0]), Slice(0,sizes[1])}, ten);
+        auto s = ten.sizes();
+        interval.index_put_({
+                Slice(0,std::min(s[0], shape[0])),
+                Slice(0,std::min(s[1], shape[1]))
+            }, ten);
 
         if (ind == 0) {
             fourier = torch::fft::fft2(interval);

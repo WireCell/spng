@@ -44,6 +44,8 @@ This assumes LibTorch choice and progress can be made on the list independent of
 
   - [ ] Assemble the filter and response ingredients that are passed to the overall convolution "kernel" builder.
   - [ ] A face-padding/unpadding function to avoid wrap-around/bleed-over artifacts on non-cyclic wire planes.
+  - [ ] Function to apply shifts to kernel arrays.
+    - eg, "wire filter" is typically given with a peak at the center of the array.
 
 * [0/3] Code organization (bv)
   - [ ] Rename ~pytorch/~ to ~torch/~ and related ([[https://github.com/WireCell/wire-cell-toolkit/issues/343][Issue 343]], hyu is on board).
