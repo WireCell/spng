@@ -3,7 +3,7 @@
 using namespace WireCell;
 
 torch::Tensor Torch::gaussian1d(double mean, double sigma,
-                                int npoints, double xmin, double xmax,
+                                int64_t npoints, double xmin, double xmax,
                                 torch::TensorOptions options)
 {
     auto x = torch::linspace(xmin, xmax, npoints, options);

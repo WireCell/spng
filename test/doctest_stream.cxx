@@ -1,5 +1,5 @@
-#include "WireCellSpng/Stream.h"
-#include "WireCellUtil/Stream.h"
+#include "WireCellSpng/Stream.h" // for write() to ostream
+#include "WireCellUtil/Stream.h" // for boost iostreams
 
 
 #include <torch/torch.h>

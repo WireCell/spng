@@ -21,7 +21,7 @@ namespace WireCell::Torch {
 
     // Return a sampled, normalized 1D Gausian pdf.
     torch::Tensor gaussian1d(double mean, double sigma,
-                             int npoints, double xmin, double xmax,
+                             int64_t npoints, double xmin, double xmax,
                              torch::TensorOptions options = torch::TensorOptions());
 
     // Return a shape large enough to assure linear convolution if the given
