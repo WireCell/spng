@@ -136,7 +136,9 @@ A number of micro benchmarks are devised which mock the operations in SP
 
 - [ ] *quantile* (percentile/median) is the next leading usage in OSP after DFT.  Specifically the exact percentile version (not the faster binned version) is used to calculate the median of a waveform in ~restore_baseline()~.  At almost similar cost, the 50 +/- 34% values are also calculated in ~ROI_formation::cal_RMS~.  Perhaps these all could be replaced with binned versions which would make this benchmark moot.  But, take it as given.  ~Waveform::percentile()~ boils down to calling ~std::nth_element()~.
 
-- [ ] *hermitian mirror*
+- [ ] *hermitian mirror* operates on a complex array to assure the first "half" of the resulting array is the complex-conjugate of the reverse (mirror) of the second "half".  Note the terms are confusing: "Hermitian-symmetry" does not mean the array is an Hermitian matrix.
+This symmetry definition is complicated in the case of an even number of array elements where the Nyquist frequency is at the center of the "Nyquist bin".  The "zero frequency" sample and the Nyquist bin sample (if exists) are real valued.
+In the symmetry is assured by WCT's ~DftTools::inv_c2r()~ and the function is not called directly by OSP.  This is done to assure the imaginary part of the inverse DFT is close to zero.  It is intended to combat FP errors accrued in Fourier-domain multiplication.  Perhaps there are ways where it can be avoided outright.  But, again, take it as given.
 
 ** Performance
 

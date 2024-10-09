@@ -197,18 +197,18 @@ static void perf(const std::string& msg,
     Tens tens(shape, device);
     tk("start");
         
-    // for (size_t ind=0; ind<tries; ++ind) {
-    //     test_spng_torch_convo(tens);
-    // }
-    // tk(msg);
-    // for (size_t ind=0; ind<tries; ++ind) {
-    //     test_spng_torch_convo_onestep(tens);
-    // }
-    // tk(msg + " one-step");
-    // for (size_t ind=0; ind<tries; ++ind) {
-    //     test_spng_torch_convo_twostep(tens);
-    // }
-    // tk(msg + " two-step");
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo(tens);
+    }
+    tk(msg);
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo_onestep(tens);
+    }
+    tk(msg + " one-step");
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo_twostep(tens);
+    }
+    tk(msg + " two-step");
     for (size_t ind=0; ind<tries; ++ind) {
         tens.s.quantile(0.5, 1);
     }
