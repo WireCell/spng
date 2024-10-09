@@ -43,7 +43,13 @@ struct Tens {
 
     std::vector<long int> shape;    
     torch::TensorOptions topt;
-    torch::Tensor s, f0, f1, f;
+    torch::Tensor s;            // a "signal"
+    torch::Tensor f0;           // a 1D filter on dim 0
+    torch::Tensor f1;           // a 1D filter on dim 1
+    torch::Tensor f;            // their outer product
+    torch::Tensor F0;           // f0 in Fourier domain
+    torch::Tensor F1;           // f1 in Fourier domain
+    torch::Tensor F;            // f in Fourier domain
     Tens(const std::vector<long int>& shape_, const torch::Device& device)
         : shape(shape_)
         , topt(torch::TensorOptions().dtype(torch::kFloat64).device(device).requires_grad(false))
@@ -51,14 +57,28 @@ struct Tens {
         , f0(torch::rand(shape[0], topt))
         , f1(torch::rand(shape[1], topt))
         , f(torch::outer(f0, f1))
+        , F0(torch::fft::fft(f0).reshape({-1,1}))
+        , F1(torch::fft::fft(f1))
+        , F(torch::fft::fft2(f))
         { }
 };
 
 
 static
-void test_spng_torch_convo_onshot(const Tens& tens, bool smallness_checks=false)
+void test_spng_torch_convo_onestep(const Tens& tens)
 {
-    torch::fft::ifft2(torch::fft::fft2(tens.s)*torch::fft::fft2(tens.f));
+    torch::fft::ifft2(torch::fft::fft2(tens.s)*tens.F);
+}
+static
+void test_spng_torch_convo_twostep(const Tens& tens)
+{
+    auto S1 = torch::fft::fft2(tens.s, torch::nullopt, {1});
+    auto SF1 = S1*tens.F1;
+
+    auto SF01 = torch::fft::fft2(SF1, torch::nullopt, {0});
+
+    auto M01 = SF01 * tens.F0;
+    auto m01 = torch::fft::ifft2(M01);
 }
 
 static
@@ -181,9 +201,13 @@ static void perf(const std::string& msg,
     }
     tk(msg);
     for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo_onshot(tens);
+        test_spng_torch_convo_onestep(tens);
     }
-    tk(msg + " one-shot");
+    tk(msg + " one-step");
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo_twostep(tens);
+    }
+    tk(msg + " two-step");
 
     std::cerr << tk.summary() << "\n";
 }

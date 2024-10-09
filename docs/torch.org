@@ -123,6 +123,25 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 * Performance testing
 
+** Micro benchmarks
+
+A number of micro benchmarks are devised which mock the operations in SP
+
+- [X] Convolution of two same-size 2D arrays by one-shot 2D DFT round trip: $DFT_{ij}^{-1}(DFT_{ij}(A) DFT_{ij}(B))$
+  - Mock basic (de)convolution where the kernel (in interval or Fourier domain) can be pre-calculated.
+
+- [X] Convolution by a 2D array with two 1D, per-dim arrays by multi-step DFT round trip: $DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))$
+  - Same as above but allow 2D kernel to be separated into per-dimension 1D kernels which are multiplied after corresponding 1D DFT.
+
+- [ ] Contiguous resizing of 2D array with zero-padding added to outer boundary.
+  - This resizing assures DFT round trip results in linear convolution.
+- [ ] Partitioned resizing of 2D array with zero-padding added as stripes in one dimension.
+  - This resizing assures the convo kernel does not bleed-over across what are really two separate arrays embedded into one.
+- [ ] ... ROI finder operations
+
+
+** Performance
+
 #+begin_example
 $ ./build/spng/wcdoctest-spng -tc="spng torch convo small*"
 $ OMP_NUM_THREADS=1  ./build/spng/wcdoctest-spng -tc="spng torch convo perf*"
@@ -170,14 +189,23 @@ Observations:
 
 - Setting ~OMP_NUM_THREADS=64~ gives no changes.  I guess OMP does not use hyper-threading?
 
-** Just one-shot DFT round trip
+** One-step vs two-step convo
 
-Isolating just the ~invDFT(DFT(S)*DFT(F))~ gives:
+Isolating these two equivalent algorithms: one-step:
 
-|   | device | time  | ncalls |
-|---+--------+-------+--------|
-| 1 | GPU    | 5.6 s |   1000 |
-| 2 | CPU    | 4.5 s |    100 |
+\[DFT_{ij}^{-1}(DFT_{ij}(A) DFT_{ij}(B))\]
+
+And two-step:
+
+\[DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))\]
+
+
+| step | device | time   | ncalls |
+|------+--------+--------+--------|
+|    1 | GPU    | 3.81 s |   1000 |
+|    2 | GPU    | 4.25 s |   1000 |
+|    1 | CPU    | 2.56 s |    100 |
+|    2 | CPU    | 4.40 s |    100 |
 
 
 
