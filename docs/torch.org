@@ -170,6 +170,16 @@ Observations:
 
 - Setting ~OMP_NUM_THREADS=64~ gives no changes.  I guess OMP does not use hyper-threading?
 
+** Just one-shot DFT round trip
+
+Isolating just the ~invDFT(DFT(S)*DFT(F))~ gives:
+
+|   | device | time  | ncalls |
+|---+--------+-------+--------|
+| 1 | GPU    | 5.6 s |   1000 |
+| 2 | CPU    | 4.5 s |    100 |
+
+
 
 * Exchanging tensors between WCT data flow graph nodes
 

@@ -43,16 +43,23 @@ struct Tens {
 
     std::vector<long int> shape;    
     torch::TensorOptions topt;
-    torch::Tensor s, f0, f1;
+    torch::Tensor s, f0, f1, f;
     Tens(const std::vector<long int>& shape_, const torch::Device& device)
         : shape(shape_)
         , topt(torch::TensorOptions().dtype(torch::kFloat64).device(device).requires_grad(false))
         , s(torch::rand(shape, topt))
         , f0(torch::rand(shape[0], topt))
         , f1(torch::rand(shape[1], topt))
+        , f(torch::outer(f0, f1))
         { }
 };
 
+
+static
+void test_spng_torch_convo_onshot(const Tens& tens, bool smallness_checks=false)
+{
+    torch::fft::ifft2(torch::fft::fft2(tens.s)*torch::fft::fft2(tens.f));
+}
 
 static
 void test_spng_torch_convo(const Tens& tens, bool smallness_checks=false)
@@ -173,6 +180,11 @@ static void perf(const std::string& msg,
         test_spng_torch_convo(tens);
     }
     tk(msg);
+    for (size_t ind=0; ind<tries; ++ind) {
+        test_spng_torch_convo_onshot(tens);
+    }
+    tk(msg + " one-shot");
+
     std::cerr << tk.summary() << "\n";
 }
 
@@ -184,4 +196,3 @@ TEST_CASE("spng torch convo perf cpu")
 {
     perf("CPU 1024x8192 x100", torch::kCPU, {1024,8192}, 100);
 }
-
