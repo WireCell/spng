@@ -81,6 +81,7 @@ void test_spng_torch_convo_twostep(const Tens& tens)
     auto m01 = torch::fft::ifft2(M01);
 }
 
+
 static
 void test_spng_torch_convo(const Tens& tens, bool smallness_checks=false)
 {
@@ -196,27 +197,47 @@ static void perf(const std::string& msg,
     Tens tens(shape, device);
     tk("start");
         
+    // for (size_t ind=0; ind<tries; ++ind) {
+    //     test_spng_torch_convo(tens);
+    // }
+    // tk(msg);
+    // for (size_t ind=0; ind<tries; ++ind) {
+    //     test_spng_torch_convo_onestep(tens);
+    // }
+    // tk(msg + " one-step");
+    // for (size_t ind=0; ind<tries; ++ind) {
+    //     test_spng_torch_convo_twostep(tens);
+    // }
+    // tk(msg + " two-step");
     for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo(tens);
+        tens.s.quantile(0.5, 1);
     }
-    tk(msg);
+    tk(msg + " quantile");
     for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo_onestep(tens);
+        tens.s.median(1);
     }
-    tk(msg + " one-step");
-    for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo_twostep(tens);
-    }
-    tk(msg + " two-step");
+    tk(msg + " median");
+    // Fixme: add Waveform:: versions
 
     std::cerr << tk.summary() << "\n";
 }
 
+const std::vector<long int> power2 = {1024,8192};
+const std::vector<long int> duneind = {800,6000};
+const std::vector<long int> dunecol = {960,6000};
+
 TEST_CASE("spng torch convo perf gpu")
 {
-    perf("GPU 1024x8192 x1000", torch::kCUDA, {1024,8192}, 1000);
+    const size_t tries=1000;
+    perf("GPU 1024x8192 x1000", torch::kCUDA, power2, tries);
+    // perf("GPU 960x6000 1000", torch::kCUDA, dunecol, tries);
+    // perf("GPU 800x6000 1000", torch::kCUDA, duneind, tries);
 }
 TEST_CASE("spng torch convo perf cpu")
 {
-    perf("CPU 1024x8192 x100", torch::kCPU, {1024,8192}, 100);
+    const size_t tries=100;
+    perf("CPU 1024x8192 x100", torch::kCPU, power2, tries);
+    // perf("CPU 960x6000 x100", torch::kCPU, dunecol, tries);
+    // perf("CPU 800x6000 x100", torch::kCPU, duneind, tries);
+
 }

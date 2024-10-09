@@ -127,18 +127,16 @@ Torch is most popularly used via its Python bindings.  The C++ API is similar bu
 
 A number of micro benchmarks are devised which mock the operations in SP
 
-- [X] Convolution of two same-size 2D arrays by one-shot 2D DFT round trip: $DFT_{ij}^{-1}(DFT_{ij}(A) DFT_{ij}(B))$
-  - Mock basic (de)convolution where the kernel (in interval or Fourier domain) can be pre-calculated.
+- [X] 2D *convolution*
+  - Consider two equivalent algorithms: one-step and two-step DFT round-trip
+    - one-step uses a 2D kernel: $DFT_{ij}^{-1}(DFT_{ij}(A) DFT_{ij}(B))$
+    - two-step uses 2 1D kernels: $DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))$
+  - When the 2D kernel is the outer product of the two 1D kernels the results are identical.
+  - Given precomputed kernels, convolution and filtered deconvolution are identical operations.
 
-- [X] Convolution by a 2D array with two 1D, per-dim arrays by multi-step DFT round trip: $DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))$
-  - Same as above but allow 2D kernel to be separated into per-dimension 1D kernels which are multiplied after corresponding 1D DFT.
+- [ ] *quantile* (percentile/median) is the next leading usage in OSP after DFT.  Specifically the exact percentile version (not the faster binned version) is used to calculate the median of a waveform in ~restore_baseline()~.  At almost similar cost, the 50 +/- 34% values are also calculated in ~ROI_formation::cal_RMS~.  Perhaps these all could be replaced with binned versions which would make this benchmark moot.  But, take it as given.  ~Waveform::percentile()~ boils down to calling ~std::nth_element()~.
 
-- [ ] Contiguous resizing of 2D array with zero-padding added to outer boundary.
-  - This resizing assures DFT round trip results in linear convolution.
-- [ ] Partitioned resizing of 2D array with zero-padding added as stripes in one dimension.
-  - This resizing assures the convo kernel does not bleed-over across what are really two separate arrays embedded into one.
-- [ ] ... ROI finder operations
-
+- [ ] *hermitian mirror*
 
 ** Performance
 
@@ -151,7 +149,7 @@ $ OMP_NUM_THREADS=32 ./build/spng/wcdoctest-spng -tc="spng torch convo perf*"
 These tests:
 - Does a 1-shot 2D FFT convolution and the same convo as two 1D, per-dimension FFT convolutions.
 - The "convo small" uses a small array and prints various results.
-- Teh "convo perf" uses array shape 1024 x 8192 and not printing and runs it many times.
+- The "convo perf" uses array shape 1024 x 8192 and not printing and runs it many times.
 - 1000 calls to the alg on GPU, 100 on CPU. A single call to ~torch::rand()~ used for all calls.
 - Use env. var. to limit number of CPU threads, confirm CPU and GPU utilization with ~top~ and ~nvidia-smi~
 
@@ -199,15 +197,33 @@ And two-step:
 
 $DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))$
 
+This is also using array size 1024x8192.
 
-| step | device | time   | ncalls |
-|------+--------+--------+--------|
-|    1 | GPU    | 3.81 s |   1000 |
-|    2 | GPU    | 4.25 s |   1000 |
-|    1 | CPU    | 2.56 s |    100 |
-|    2 | CPU    | 4.40 s |    100 |
+| step | device   | time   | ncalls |
+|------+----------+--------+--------|
+|    1 | GPU      | 3.81 s |   1000 |
+|    2 | GPU      | 4.25 s |   1000 |
+|    1 | CPU (32) | 2.56 s |    100 |
+|    2 | CPU (32) | 4.40 s |    100 |
+|    1 | CPU (16) | 2.98 s |    100 |
+|    2 | CPU (16) | 5.73 s |    100 |
 
 
+** Quantile and median
+
+|          | device  | time s | ncalls |
+|----------+---------+--------+--------|
+| quantile | GPU     |   4.02 |   1000 |
+| median   | GPU     |  0.146 |   1000 |
+|----------+---------+--------+--------|
+| quantile | CPU(32) |   2.17 |    100 |
+| median   | CPU(32) |  0.271 |    100 |
+| quantile | CPU(16) |   3.53 |    100 |
+| median   | CPU(16) |  0.531 |    100 |
+| quantile | CPU(1)  |   46.8 |    100 |
+| median   | CPU(1)  |   7.74 |    100 |
+
+The speed difference between quantile and median is attributed to different algorithms.  The quantile can be arbitrary (not just 50%) and requires a sort, perhaps O(n log n).  The median lends to [[https://rcoh.me/posts/linear-time-median-finding/][O(n) algorithms]].  However, many quantile of a given signal can be calculated at the same cost as one.
 
 * Exchanging tensors between WCT data flow graph nodes
 
