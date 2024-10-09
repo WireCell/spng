@@ -193,11 +193,11 @@ Observations:
 
 Isolating these two equivalent algorithms: one-step:
 
-\[DFT_{ij}^{-1}(DFT_{ij}(A) DFT_{ij}(B))\]
+$DFT_{ij}^{-1}(DFT_{ij}(A) DFT_{ij}(B))$
 
 And two-step:
 
-\[DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))\]
+$DFT_{ij}^{-1}(DFT_{j}(DFT_{i}(b1) DFT_{i}(B))DFT_{j}(b2))$
 
 
 | step | device | time   | ncalls |
