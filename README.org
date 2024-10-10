@@ -44,15 +44,23 @@ $ ln -s ../spng .
 From then on we treat ~spng/~ as a normal WCT "subpackage", still in ~wire-cell-toolkit/~:
 
 #+begin_example
-$ ./wcb configure --prefix=$PREFIX \
-    --boost-mt --boost-libs=$PREFIX/lib --boost-include=$PREFIX/include \
-    --with-jsonnet-libs=gojsonnet \
-    --with-cuda-lib=/usr/lib/x86_64-linux-gnu,$PREFIX/targets/x86_64-linux/lib \
-    --with-libtorch-lib=$PREFIX/lib/python3.11/site-packages/torch/lib \
-    --with-libtorch-include=$PREFIX/lib/python3.11/site-packages/torch/include
+$ TDIR=$PREFIX/lib/python3.11/site-packages/torch \
+  ./wcb configure \
+  --prefix=$PREFIX \
+  --boost-mt \
+  --boost-libs=$PREFIX/lib \
+  --boost-include=$PREFIX/include \
+  --with-jsonnet-libs=gojsonnet \
+  --with-cuda-lib=/usr/lib/x86_64-linux-gnu,$PREFIX/targets/x86_64-linux/lib \
+  --with-libtorch=$TDIR \
+  --with-libtorch-include=$TDIR/include,$TDIR/include/torch/csrc/api/include \
+  --with-libtorch-lib=$TDIR/lib
+
 $ ./wcb
 #+end_example
 
 An example for how ~PREFIX~ may be defined is at:
 
 https://www.phy.bnl.gov/~bviren/wire-cell/docs/wcwc-howto.html#spack-view-wct
+
+Torch is a bit weirdly installed.  Besides its prefix (~TDIR~) being deep under ~$PREFIX~ in the Python-related files, it requires *two* include directories, one inside the other, to be specified.
