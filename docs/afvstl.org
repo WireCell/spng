@@ -1,0 +1,112 @@
+#+title: ArrayFire vs LibTorch for SPNG
+
+* Introduction
+
+The design of SPNG is fundamentally array-based with the following requirements on the array data structure and operation.  The following requirements on the array class and function API:
+
+- Provide float32 and complex32 array element types.
+- Support sub-array indexing.
+- Usual element-wise arithmetic.
+- 1D and 2D forward and inverse DFT.
+- Transparent and runtime choice to place data and operations on CPU or GPU device.
+  - Support for at least nvidia GPUs.
+- Thread-safe "const" / read-only access of array data.
+- Ability to transfer array reference across threads to consumers without copying through host memory.
+- Access array's contiguous elements in host memory.
+- Produce an array from contiguous host memory.
+- Provide or enable development of file I/O
+- An efficient mechanism to marshal arrays in to and out from DNN inference models.
+  - Support use of models trained with and saved by PyTorch.
+- Ability to lend underlying array memory for use by non array-code.
+- C++ level const correctness.  
+- Provide or enable file I/O in Numpy format.
+- Clear developer documentation and API reference.
+- Support DNN models in TorchScript (~.ts~) file format.
+
+Given initial understanding of requirements and options, two candidates have been considered.
+
+- [[https://arrayfire.org/][ArrayFire]] "arrays"
+- [[https://pytorch.org/cppdocs/][LibTorch]] "tensors"
+
+The rest of this document compares the two candidates and attempts to conclude with a justified selection.
+
+* Initial biases
+
+SPNG is to become a subpackage of Wire-Cell Toolkit which already has a dependency on LibTorch.  LibTorch is the basis of two main WCT components: an ~IDFT~ (discrete Fourier transform operations) and an ~IForward~ (inference).  It also provides a semaphore-based mechanism to limit the load submitted via LibTorch by WCT on the GPU.
+These features appear to give LibTorch an initial advantage.  However, that is attenuated by a few facts.
+
+- The ~IDFT~ can be ignored as it inherently requires any array to suffer a round trip from host memory to device memory and back.  One of the principles of SPNG design is to remove any such round trips.
+- Array data can be marshalled through LibTorch tensors in order to use current ~IForward~ unchanged.  This may impose some overhead if an array copy or an array host/device roundtrip is required.
+- If the overhead is not acceptable, there is a good chance that existing LibTorch based ~IForward~ users (so far just DNNROI) can provide their inference models in a format that ArrayFire can utilize directly.
+
+Of course, WCT currently depends on LibTorch while ArrayFire would be a new dependency.  This bias is also somewhat attenuated as use of LibTorch with GPU is not widespread and requires some new work in various software ecosystems to supply GPU-enabled LibTorch.
+
+* Requirements
+
+Most of the requirements are met by both and need no comment.  This section describes some specific issues with one or both meeting a requirement.
+
+** Handling of arrays on CPU vs GPU
+
+A LibTorch array is "on" a CPU devie or a GPU device and can be explicitly sent ~to(device)~ one or the other.  C++ code can not directly access the array data in normal C++ code directly without either expensive indexing or via  "accessor" code that must be written differently for CPU or for GPU (CUDA).
+
+An ArrayFire array is "on" a "device".  There is no ~to()~ method.  There is a ~host<type>()~ function that returns a *copy* of array data as C++ data and which becomes owned by the caller.  A ~device()~ returns  a "device pointer" to memory on a device.  Ownership is not transferred to the caller but the memory is "locked" until ~unlock()~ is called. While locked the memory can be used by other device (eg CUDA) code.
+
+Both provide ways to construct an array on existing host data while avoiding a copy (~torch::from_blob()~ and constructing an AF array with pointer and ~afDevice~ flag.
+
+** Memory management and const correctness
+
+LibTorch arrays are effectively a ~shared_ptr<TensorImp>~ with a large facade API.
+The data of the underlying array type (~TensorImp~) is never ~const~.
+With LibTorch, ~const~-correctness is not possible at C++ level and must rely on developer contract.
+
+ArrayFire arrays are also handles on array memory.  While they may perform reference counting of the underlying array data and provide a facade, they do allow const correctness.  This appears to be possible by making ~host<type>()~ be effectively a ~new~ and passing ownership to the caller while ~device()~ has the "lock" mechanism (it can return host memory that will not be deleted by AF unless/until unlocked). 
+
+** File I/O
+
+Both provide "proprietary" file format which are essentially binary dumps of the array data.  WCT provides an ~std::ostream~ based I/O using Boost ~iostreams~ and read/write numpy files.  These support array data in ~std::vector~, Eigen3 and recently LibTorch.  Adding support for ArrayFire would need to be developed but is simple to do so.
+
+** Documentation
+
+LibTorch documentation is largely useless.  Reading headers provides more information than online APIs.  A few pages with high level documentation exists but is not comprehensive.  Developers can rely on LibTorch API being somewhat similar to the PyTorch API, which does have better documentation.  Developing with LibTorch requires constant google searching and grepping of headers.  As the developer continues and learns the difficulty this causes reduces somewhat but it is incredibly unfriendly experience to new developers.
+
+ArrayFire documentation is plentiful and clear.  A number of high level tutorials exist and the API reference documentation is embellished with clear function description, argument and return types and in some cases lengthy notes and comments.  All is collected and organized at ~arrayfire.org~ which provides built-in and effective search.
+
+* Performance tests
+
+The existing WCT ~OmnibusSigProc~ was examined and its three largest bottlenecks were considered for mocking in micro-benchmarks:
+
+- Convolution via discrete Fourier transform.
+- Calculation of median and arbitrary quantile/percentile.
+- Construction of Hermitian-symmetric arrays.
+
+** Convolution via DFT
+
+This micro-benchmark entails convolving a 2D array with a 2D kernel with shapes:
+
+A. ~(1024,8192)~ perfect powers of 2
+B. ~(960,6000)~ DUNE "induction" plane
+C. ~(800,6000)~ DUNE "collection" plane
+
+The non-power-of-2 examples are to assure the DFT implementations have no pathology for sizes that have small prime factors other than two (largest prime is 5).  The results utilize AMD Ryzen Threadripper 7970X CPU (32 cores) and    NVIDIA GeForce RTX 4090 GPU.
+
+|   | device  | ArrayFire | LibTorch |    N |
+|---+---------+-----------+----------+------|
+| A | GPU     | 1178      |     3812 | 1000 |
+| A | CPU(1)  |           |          |      |
+| A | CPU(32) | n/a       |          |      |
+
+LibTorch has parallel array operations via OpenMP.
+ArrayFire has no support for parallel array operations in its default CPU backend but it is possible its OpenCL may provide for this.
+
+** Median and quantile
+
+
+* Build issues
+
+https://github.com/arrayfire/arrayfire/issues/3516
+
+* ArrayFire issues
+
+Arrays constructed on a particular "device" based on the current, globally-defined [[https://arrayfire.org/docs/unifiedbackend.htm#gsc.tab=0]["backend"]] (eg, CPU vs CUDA).  It is not allowed to combine arrays on different devices.  Regardless of what "device" the array resides, memory on the "host" (ie, C++ / CPU data) can be accessed via ~T* host<T>()~.  Caller becomes owner of returned memory.
+
+* LibTorch issues
