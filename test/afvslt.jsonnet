@@ -1,20 +1,27 @@
-{
-    gpu: true,
-    seed: 123456,
-    arrays: {
-        signal: {
-            shape: [1024, 8192],
-        },
-        response: {
-            shape: [1024, 8192],
-        }
-    },
-    tests: [
-        {
-            kind: "convo",
-            signal: "signal",
-            response: "response",
-            repeat: 10,
-        }
-    ],
-}
+// Enforce schema via function calls.
+
+// generic performance test schema
+local perf(tech, kind, repeat, device, shape) = {
+    tech: tech,
+    kind: kind,
+    repeat: repeat,
+    device: device,
+    shape: shape,
+};
+
+local repeats = {
+    convo: { gpu:5000, cpu:50 },
+    median: { gpu:5000, cpu:10 },
+    sort: { gpu:10000, cpu:10 },
+};
+
+local shapes = [ [1024,8192], ];
+
+function(techs="af,lt", devices="gpu,cpu", tests="convo,median,sort")
+[
+    perf(tech, tname, repeats[tname][dev], dev, shape)
+    for dev in std.split(devices,",")
+    for tech in std.split(techs,",")
+    for shape in shapes
+    for tname in std.split(tests,",")
+]

@@ -18,11 +18,21 @@
 
 // A small subset of technology-independent array API which are specialize for a
 // given array technology below.
-template<typename T> T fft2(const T& arr);
-template<typename T> T ifft2(const T& arr);
-template<typename T> T median(const T& arr);
-template<typename T> T quantile(const T& arr, const T& q);
+namespace vs {
+    template<typename T> float to_float(const T& arr);
 
+    template<typename T> T real(const T& arr);
+    template<typename T> T imag(const T& arr);
+    template<typename T> T fft2(const T& arr);
+    template<typename T> T ifft2(const T& arr);
+    template<typename T> T median(const T& arr, int dim=0);
+    template<typename T> T sort(const T& arr, int dim=0);
+
+    // Call to finish calculation (for lazy libs like AF).
+    template<typename T> T& eval(T& arr);
+    // Finish all lazy calculations
+    template<typename T> void sync();
+}
 
 #include <unordered_map>
 #include <string>
@@ -45,32 +55,60 @@ double tdiffms(time_point t)
     return std::chrono::duration<double, std::milli>(now() - t).count();
 }
 
-struct Perf {
-    using size_type = long long;
-    using shape_type = std::vector<size_type>;
+// Get a value of a key in an object, setting it to default if missing.
+template<typename T> T getdef(json& jobj, const std::string& key, const T& def) {
+    auto ret = jobj.value<T>(key, def);
+    jobj[key] = ret;
+    return ret;
+}
+    
+using size_type = long long;
+using shape_type = std::vector<size_type>;
 
-    json data;
+size_type shape_size(const shape_type& shape)
+{
+    size_t nele = 1;
+    for (auto& dim : shape) {
+        nele *= dim;
+    }
+    return nele;
+}
+
+shape_type to_shape(const json& jshape)
+{
+    shape_type shape;
+    for (const auto& ele : jshape) {
+        size_t size = ele;
+        shape.push_back(size);
+    }
+    return shape;
+}
+
+// Partially abstract base class for use by templated mid class with
+// implementations by a concrete base class.
+struct Perf {
 
     std::default_random_engine rng;
     std::uniform_real_distribution<float> runiform;
 
-    Perf()
-        : runiform(0,1)
+    Perf(long unsigned int seed = 12345)
+        : rng{seed}
+        , runiform(0,1)
         {}
 
-    virtual void add(const std::string& name, const float* data, const shape_type& shape) = 0;
-    virtual void init(const json& cfg) {
-        data = cfg;
-        int seed = get_update("seed", 12345);
-    };
-    virtual void run() = 0;
+    // Template class can call for one-time init prior to a run_*().  
+    // Must return cfg, possibly after modification.
+    virtual json prerun(json tst) { return tst; };
 
-    template<typename T>
-    T get_update(const std::string& key, T def) {
-        auto ret = data.value<T>(key, def);
-        data[key] = ret;
-        return ret;
-    }
+
+    // Tech-independent adding of a named, random array.  
+    virtual void add(const std::string& name, const shape_type& shape) = 0;
+    virtual void add(const std::string& name, const shape_type& shape, const float* data) = 0;
+
+    // The tests
+    virtual json run_convo(json tst) = 0;
+    virtual json run_median(json tst) = 0;
+    virtual json run_sort(json tst) = 0;
 
     std::unique_ptr<float[]> randu(size_t n) {
         auto dat = std::make_unique<float[]>(n);
@@ -80,25 +118,34 @@ struct Perf {
         return dat;
     }
 
-    void add_array(const std::string& name, const json& cfg) {
-        std::cerr << "add_array " << name << " " << cfg << "\n";
-        auto jshape = cfg["shape"];
-        size_t ndim = jshape.size();
-        std::cerr << "jshape=" << jshape << " ndim=" << ndim << "\n";
-        shape_type shape(ndim);
-        size_t nele = 1;
-        for (size_t ind=0; ind<ndim; ++ind) {
-            size_t dim = jshape[ind];
-            shape[ind] = dim;
-            std::cerr << ind << " " << dim << "\n";
-            nele *= dim;
-        }
-        std::cerr << "add_array " << name << " " << cfg << " nele=" << nele << "\n";
+};
 
-        auto data = randu(nele);
-        add(name, data.get(), shape);
+
+struct TestConfig {
+    size_t repeat;
+    shape_type shape;
+    std::string device;
+    time_point start{now()};
+
+    TestConfig(const json& tst)
+        : repeat(tst["repeat"])
+        , shape(tst["shape"])
+        , device(tst["device"])
+        {
+        }
+
+    void go() {
+        start = now();
     }
 
+    json results() {
+        json ret;
+        double ttot = tdiffms(start);
+        ret["time"] = ttot;
+        ret["dt"] = ttot / repeat;
+        return ret;
+    }
+        
 
 };
 
@@ -109,64 +156,90 @@ struct PerfT : public Perf {
 
     std::unordered_map<std::string, T> arrays;
 
-    json run_convo(const json& cfg) {
-        std::cerr << "run_convo: " << cfg << "\n";
-        size_t repeat = cfg["repeat"];
-        std::string sname = cfg["signal"];
-        std::string rname = cfg["response"];
-        std::cerr << "repeat:" << repeat << " sname:"<<sname << " rname:" <<rname << "\n";
-        const T& s = arrays[sname];
-        const T& r = arrays[rname];
+    json run_convo(json tst) {
+        TestConfig tc(tst);
 
-        auto R = fft2(r);
+        add("signal", tc.shape);
+        add("response", tc.shape);
+        add("total", tc.shape);
+        const T& s = arrays["signal"];
+        const T& r = arrays["response"];
 
-        auto t = now();
-        while (repeat--) {
-            std::cerr << "convolve: " << repeat << " " << tdiffms(t) << "\n";
-            auto S = ifft2(fft2(s) * R);
+        // meaningless accumulate to assure complete eval.
+        T tot = arrays["total"];
+
+        auto R = vs::fft2(r);
+
+        tc.go();
+
+        for (size_t count = 0; count < tc.repeat; ++count) {
+            // auto t0 = now();
+
+            // auto t = now();
+            auto S = vs::fft2(s);
+            // double dt_S = tdiffms(t);
+
+            // t = now();
+            auto SR = S*R;
+            // double dt_SR = tdiffms(t);
+
+            // t = now();
+            auto m = vs::ifft2(SR);
+            // double dt_m = tdiffms(t);
+            
+            // t = now();
+            // double dt_sync = tdiffms(t);
+
+            // double dt = tdiffms(t0);
+            // std::cerr << count << ": S:" << dt_S << " SR:" << dt_SR << " m:" << dt_m
+            //           << " sync:" << dt_sync << " tot:" << dt << "\n";
+
+            tot += vs::real(m);
         }
+        vs::sync<T>();
 
-        json results;
-        results["time"] = tdiffms(t);
-        return results;
-    }
-    json run_median(const json& cfg) {
-        json results;
-        return results;
-    }
-    json run_quantile(const json& cfg) {
-        json results;
-        return results;
+        return tc.results();
     }
 
-    virtual void run() {
-        auto arrays = data["arrays"];
-        for (auto& [name, cfg] : arrays.items()) {
-            add_array(name, cfg);
+    json run_median(json tst) {
+        TestConfig tc(tst);
+
+        add("signal", tc.shape);
+        const T& s = arrays["signal"];
+
+        shape_type shape1d = {tc.shape[0]};
+        add("total", shape1d);
+        T tot = arrays["total"];
+
+        tc.go();
+
+        for (size_t count = 0; count < tc.repeat; ++count) {
+
+            tot += vs::median(s, 1);
         }
-        
+        vs::sync<T>();
 
-        auto& tests = data["tests"];
-        size_t ntests = tests.size();
-        for (size_t itest=0; itest<ntests; ++itest) {
-            auto& test = tests[itest];
-            std::string kind = test["kind"];
+        return tc.results();
+    }
 
-            if (kind == "convo") {
-                tests[itest]["results"] = run_convo(test);
-                continue;
-            }
-            if (kind == "median") {
-                tests[itest]["results"] = run_median(test);
-                continue;
-            }
-            if (kind == "quantile") {
-                tests[itest]["results"] = run_quantile(test);
-                continue;
-            }
-            std::cerr << "unknown test: " << test << "\n";
+    json run_sort(json tst) {
+
+        TestConfig tc(tst);
+
+        add("signal", tc.shape);
+        const T& s = arrays["signal"];
+
+        add("total", tc.shape);
+        T tot = arrays["total"];
+
+        tc.go();
+
+        for (size_t count = 0; count < tc.repeat; ++count) {
+            tot += vs::sort(s, 1);
         }
-        
+        vs::sync<T>();
+
+        return tc.results();
     }
     
 };
@@ -177,24 +250,50 @@ struct PerfT : public Perf {
 
 struct PerfAF : public PerfT<af::array> {
     
-    virtual void init(const json& cfg) {
-        Perf::init(cfg);
-        if (get_update<bool>("gpu", false)) {
+    virtual json prerun(json tst) {
+        if (getdef<std::string>(tst, "device", "cpu") == "gpu") {
             af::setBackend(AF_BACKEND_CUDA);
         }
         else {
             af::setBackend(AF_BACKEND_CPU);            
         }
+        tst["tech"] = "af";
+        return tst;
     }
 
-    virtual void add(const std::string& name, const float* data, const shape_type& shape) {
+    virtual void add(const std::string& name, const shape_type& shape) {
+        auto data = randu(shape_size(shape));
         af::dim4 dims(shape.size(), shape.data());
-        arrays[name] = af::array(dims, data);
+        arrays[name] = af::array(dims, data.get()); // type from float*
+    }
+
+    virtual void add(const std::string& name, const shape_type& shape, const float* data) {
+        af::dim4 dims(shape.size(), shape.data());
+        arrays[name] = af::array(dims, data); // type from float*
     }
 
 };
 
 
+namespace vs {
+
+
+template<>
+float to_float<af::array>(const af::array& arr)
+{
+    return arr.scalar<float>();
+}
+
+template<>
+af::array real<af::array>(const af::array& arr)
+{
+    return af::real(arr);
+}
+template<>
+af::array imag<af::array>(const af::array& arr)
+{
+    return af::imag(arr);
+}
 
 template<>
 af::array fft2<af::array>(const af::array& arr)
@@ -207,47 +306,86 @@ af::array ifft2<af::array>(const af::array& arr)
     return af::ifft2(arr);
 }
 template<>
-af::array median<af::array>(const af::array& arr)
+af::array median<af::array>(const af::array& arr, int dim)
 {
-    return af::median(arr);
+    return af::median(arr, dim);
 }
     
-// ArrayFire apparently does not provide quantile().  This is a nominal
-// implementation but assumes 1D array.
-template<>
-af::array quantile<af::array>(const af::array& arr, const af::array& q)
+
+template<> af::array& eval<af::array>(af::array& arr)
 {
-    af::array ret(q.dims(), q.type());
-    auto sorted = af::sort(arr);
-    
-    auto N = q.dims(0);
-    gfor(af::seq ind, N) {
-        ret(ind) = sorted(q(ind)*N);
-    }
-    return ret;
+    return af::eval(arr);
 }
-#endif
+template<> void sync<af::array>()
+{
+    af::sync();
+}
+
+template<> af::array sort<af::array>(const af::array& arr, int dim)
+{
+    return af::sort(arr, dim);
+}
+
+
+} // namespace vs
+
+#endif  // USE_ARRAYFIRE
 
 #ifdef USE_LIBTORCH
 #include "torch/torch.h"
 
 struct PerfLT : public PerfT<torch::Tensor> {
 
-    torch::TensorOptions to;
+    std::string device{"cpu"};
 
-    virtual void init(const json& cfg) {
-        Perf::init(cfg);
-        if (get_update<bool>("gpu", false)) {
-            to = to.device(torch::kCUDA);
-        }
+    virtual json prerun(json tst) {
+        device = getdef<std::string>(tst, "device", "cpu");
+        tst["tech"] = "lt";
+        return tst;
     }
 
-    virtual void add(const std::string& name, const float* data, const shape_type& shape) {
+    virtual void add(const std::string& name, const shape_type& shape) {
+        auto data = randu(shape_size(shape));
         std::vector<int64_t> tshape(shape.begin(), shape.end());
-        arrays[name] = torch::from_blob((void*)data, tshape, to);
+        auto borrowed = torch::from_blob((void*)(data.get()), tshape);
+        borrowed = borrowed.clone();
+        if (device == "gpu") {
+            borrowed = borrowed.to(torch::kCUDA);
+        }
+        arrays[name] = borrowed.clone();
     }
-    
+
+    virtual void add(const std::string& name, const shape_type& shape, const float* data) {
+        std::vector<int64_t> tshape(shape.begin(), shape.end());
+        auto borrowed = torch::from_blob((void*)(data), tshape);
+        borrowed = borrowed.clone();
+        if (device == "gpu") {
+            borrowed = borrowed.to(torch::kCUDA);
+        }
+        arrays[name] = borrowed.clone();
+    }
+
 };
+
+
+namespace vs {
+
+template<>
+float to_float<torch::Tensor>(const torch::Tensor& arr)
+{
+    return arr.item<float>();
+}
+
+template<>
+torch::Tensor real<torch::Tensor>(const torch::Tensor& arr)
+{
+    return torch::real(arr);
+}
+template<>
+torch::Tensor imag<torch::Tensor>(const torch::Tensor& arr)
+{
+    return torch::imag(arr);
+}
 
 template<>
 torch::Tensor fft2<torch::Tensor>(const torch::Tensor& ten)
@@ -260,17 +398,34 @@ torch::Tensor ifft2<torch::Tensor>(const torch::Tensor& ten)
     return torch::fft::ifft2(ten);
 }
 template<>
-torch::Tensor median<torch::Tensor>(const torch::Tensor& ten)
+torch::Tensor median<torch::Tensor>(const torch::Tensor& ten, int dim)
 {
-    return ten.median();
-}
-template<>
-torch::Tensor quantile<torch::Tensor>(const torch::Tensor& ten, const torch::Tensor& q)
-{
-    return ten.quantile(q);
+    auto tup = ten.median(dim);
+    return std::get<0>(tup);
 }
 
-#endif
+template<> torch::Tensor sort<torch::Tensor>(const torch::Tensor& arr, int dim)
+{
+    auto tup = torch::sort(arr, dim);
+    return std::get<0>(tup);
+}
+
+// Note, torch IS lazy also, at least for GPU.  But, more is needed to implement
+// eval/sync than I want to do right now.
+// https://pytorch.org/docs/stable/notes/cuda.html#asynchronous-execution
+template<> torch::Tensor& eval<torch::Tensor>(torch::Tensor& arr)
+{
+    return arr;
+}
+
+template<> void sync<torch::Tensor>()
+{
+    return;
+}
+
+} // namespace vs
+
+#endif  // USE_LIBTORCH
 
 
 void die(const std::string& msg) {
@@ -290,24 +445,49 @@ int test_lt(int argc, char* argv[])
     return 0;
 }
 
-json perf(const json& cfg)
+json perf(json tsts)
 {
-    std::string tech = cfg.value("tech", "af");
-    std::unique_ptr<Perf> p;
+    json results;
 
-    if (tech == "af") {
-        p = std::make_unique<PerfAF>();
+    for (auto& tst : tsts) {
+        auto tech = getdef<std::string>(tst, "tech", "af");
+        std::unique_ptr<Perf> p;
+
+        if (tech == "af") {
+            p = std::make_unique<PerfAF>();
+        }
+        else if (tech == "lt") {
+            p = std::make_unique<PerfLT>();
+        }
+        if (!p) {
+            std::cerr << "skipping unknown tech: " << tech << "\n" << tst << "\n";
+            continue;
+        }
+
+        tst = p->prerun(tst);
+
+        std::cerr << tst << "\n";
+
+        json result;
+        std::string kind = tst["kind"];
+        if (kind == "convo") {
+            result = p->run_convo(tst);
+        }
+        else if (kind == "median") {
+            result = p->run_median(tst);
+        }
+        else if (kind == "sort") {
+            result = p->run_sort(tst);
+        }
+        else {
+            std::cerr << "unknown test: " << tst << "\n";
+        }
+        json jtest;
+        jtest["input"] = tst;
+        jtest["output"] = result;
+        results.push_back(jtest);
     }
-    if (tech == "lt") {
-        p = std::make_unique<PerfLT>();
-    }
-    if (!p) {
-        json empty;
-        return empty;
-    }
-    p->init(cfg);
-    p->run();
-    return p->data;
+    return results;
 }
 
 int main(int argc, char* argv[])
@@ -324,9 +504,9 @@ int main(int argc, char* argv[])
     }
         
     std::ifstream ifile(iname);
-    auto cfg = json::parse(ifile);
+    auto tsts = json::parse(ifile);
 
-    auto res = perf(cfg);
+    auto res = perf(tsts);
 
     std::ofstream ofile(oname);
     ofile << std::setw(4) << res << std::endl;

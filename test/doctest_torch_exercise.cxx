@@ -28,7 +28,7 @@ void dump(const T& ten, const std::string& msg="")
     if (msg.size()) {
         std::cerr << msg << "\n";
     }
-    if (ten.dtype() == torch::kComplexDouble) {
+    if (ten.dtype() == torch::kComplexFloat) {
         std::cerr << "real\n";
         std::cerr << torch::real(ten) << "\n";
         std::cerr << "imag\n";
@@ -52,7 +52,7 @@ struct Tens {
     torch::Tensor F;            // f in Fourier domain
     Tens(const std::vector<long int>& shape_, const torch::Device& device)
         : shape(shape_)
-        , topt(torch::TensorOptions().dtype(torch::kFloat64).device(device).requires_grad(false))
+        , topt(torch::TensorOptions().dtype(torch::kFloat32).device(device).requires_grad(false))
         , s(torch::rand(shape, topt))
         , f0(torch::rand(shape[0], topt))
         , f1(torch::rand(shape[1], topt))
@@ -154,12 +154,12 @@ void test_spng_torch_convo(const Tens& tens, bool smallness_checks=false)
     dump(m01, "m01");
 
     if (smallness_checks) {
-        auto im = torch::max(torch::abs(m_i)).item<double>();
-        auto im_01 = torch::max(torch::abs(m01_i)).item<double>();
+        auto im = torch::max(torch::abs(m_i)).item<float>();
+        auto im_01 = torch::max(torch::abs(m01_i)).item<float>();
         REQUIRE(im < 1e-12);
         REQUIRE(im_01 < 1e-12);
         auto dr = torch::abs(m - m01);
-        auto dr_max = torch::max(dr).item<double>();
+        auto dr_max = torch::max(dr).item<float>();
         REQUIRE(dr_max < 1e-8);
 
         dump(dr, "dr");
@@ -197,22 +197,26 @@ static void perf(const std::string& msg,
     Tens tens(shape, device);
     tk("start");
         
-    for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo(tens);
-    }
-    tk(msg);
+    // for (size_t ind=0; ind<tries; ++ind) {
+    //     test_spng_torch_convo(tens);
+    // }
+    // tk(msg);
+
     for (size_t ind=0; ind<tries; ++ind) {
         test_spng_torch_convo_onestep(tens);
     }
     tk(msg + " one-step");
-    for (size_t ind=0; ind<tries; ++ind) {
-        test_spng_torch_convo_twostep(tens);
-    }
-    tk(msg + " two-step");
+
+    // for (size_t ind=0; ind<tries; ++ind) {
+    //     test_spng_torch_convo_twostep(tens);
+    // }
+    // tk(msg + " two-step");
+
     for (size_t ind=0; ind<tries; ++ind) {
         tens.s.quantile(0.5, 1);
     }
     tk(msg + " quantile");
+
     for (size_t ind=0; ind<tries; ++ind) {
         tens.s.median(1);
     }
