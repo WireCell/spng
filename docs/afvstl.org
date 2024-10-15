@@ -75,30 +75,38 @@ ArrayFire documentation is plentiful and clear.  A number of high level tutorial
 
 The existing WCT ~OmnibusSigProc~ was examined and its three largest bottlenecks were considered for mocking in micro-benchmarks:
 
-- Convolution via discrete Fourier transform.
-- Calculation of median and arbitrary quantile/percentile.
-- Construction of Hermitian-symmetric arrays.
+1. Convolution via discrete Fourier transform.  
+2. Calculation of median and arbitrary quantile/percentile.
+3. Construction of Hermitian-symmetric arrays.
 
-** Convolution via DFT
+The second poses problems as quantile is not implemented in AF.  However, it's core kernel is a sort, and this is tested.
 
-This micro-benchmark entails convolving a 2D array with a 2D kernel with shapes:
+The third is excluded as it is not expected to be required (currently used to construct the "high frequency" half spectrum which could/should be included specifically).
 
-A. ~(1024,8192)~ perfect powers of 2
-B. ~(960,6000)~ DUNE "induction" plane
-C. ~(800,6000)~ DUNE "collection" plane
+The results:
 
-The non-power-of-2 examples are to assure the DFT implementations have no pathology for sizes that have small prime factors other than two (largest prime is 5).  The results utilize AMD Ryzen Threadripper 7970X CPU (32 cores) and    NVIDIA GeForce RTX 4090 GPU.
+| test   | dev | tech | time (ms) |
+|--------+-----+------+-----------|
+| convo  | GPU | AF   |      2.20 |
+| convo  | GPU | LT   |      0.89 |
+| convo  | CPU | AF   |    667.74 |
+| convo  | CPU | LT   |    158.24 |
+|--------+-----+------+-----------|
+| median | GPU | AF   |      1.30 |
+| median | GPU | LT   |      0.18 |
+| median | CPU | AF   |   1109.09 |
+| median | CPU | LT   |     76.73 |
+|--------+-----+------+-----------|
+| sort   | GPU | AF   |      1.33 |
+| sort   | GPU | LT   |      1.55 |
+| sort   | CPU | AF   |   1119.37 |
+| sort   | CPU | LT   |    383.22 |
+|--------+-----+------+-----------|
 
-|   | device  | ArrayFire | LibTorch |    N |
-|---+---------+-----------+----------+------|
-| A | GPU     | 1178      |     3812 | 1000 |
-| A | CPU(1)  |           |          |      |
-| A | CPU(32) | n/a       |          |      |
-
-LibTorch has parallel array operations via OpenMP.
-ArrayFire has no support for parallel array operations in its default CPU backend but it is possible its OpenCL may provide for this.
-
-** Median and quantile
+This is reproduced with:
+#+begin_example
+ jsonnet spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt > fulltest.json
+#+end_example
 
 
 * Build issues
@@ -107,6 +115,26 @@ https://github.com/arrayfire/arrayfire/issues/3516
 
 * ArrayFire issues
 
+** Building
+
+The latest version 3.9.0 added certain desirable features so is the minimum version considered.  The Spack recipe required updates [[https://github.com/spack/spack/pull/46490][PR]].  It has hits some problems related to spdlog via fmt API changes that WCT has faced but otherwise builds fairly well.
+
+Building against AF is a far simpler story than libtorch.  One needs only link to the "unified" ~libaf.so~.
+
+
+
+** Compute devices
+
 Arrays constructed on a particular "device" based on the current, globally-defined [[https://arrayfire.org/docs/unifiedbackend.htm#gsc.tab=0]["backend"]] (eg, CPU vs CUDA).  It is not allowed to combine arrays on different devices.  Regardless of what "device" the array resides, memory on the "host" (ie, C++ / CPU data) can be accessed via ~T* host<T>()~.  Caller becomes owner of returned memory.
 
+
+
+
 * LibTorch issues
+
+** Building
+
+LibTorch is a large package, on par with ROOT.  Building Spack's ~py-torch~ package is more or less straight-forward once it is understood that Spack's ~cuda~ package does not actually provide ~libcuda.so~.
+
+Building against LibTorch has several issues.  Torch is provided as several shared libs and one must explicitly link a couple extra for CUDA support.  The Torch headers are unusually provided in two locations, one inside the other and requiring two ~-I~ compiler flags.
+
