@@ -1,5 +1,6 @@
 #!/bin/bash
-top=$(dirname $(realpath $BASH_SOURCE))
+top=$(realpath $PREFIX/..)
+echo $top
 
 prog=afvslt
 export TDIR=$PREFIX/lib/python3.11/site-packages/torch

@@ -105,6 +105,7 @@ The results:
 
 This is reproduced with:
 #+begin_example
+ ./spng/test/build-afvslt
  jsonnet spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt > fulltest.json
 #+end_example
 
