@@ -13,11 +13,12 @@ local repeats = {
     convo: { gpu:5000, cpu:50 },
     median: { gpu:5000, cpu:10 },
     sort: { gpu:10000, cpu:10 },
+    arith: { gpu:10000, cpu:100 },
 };
 
 local shapes = [ [1024,8192], ];
 
-function(techs="af,lt", devices="gpu,cpu", tests="convo,median,sort")
+function(techs="af,lt", devices="gpu,cpu", tests="convo,median,sort,arith")
 [
     perf(tech, tname, repeats[tname][dev], dev, shape)
     for dev in std.split(devices,",")

@@ -3,9 +3,25 @@
   Apples-to-apples performance comparison between ArrayFire and LibTorch for
   bottleneck operations identified from OmnibusSigProc.
 
-  It is built in a stand-alone manner:
+  It is built in a stand-alone manner with a script:
 
-  
+    ./spng/test/build-afvslt
+
+  Run all tests like:
+
+    jsonnet spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt
+
+  Run narrowed tests:
+
+    jsonnet spng/test/afvslt.jsonnet -A tests=convo -A devices=gpu   -A techs=af,lt | OMP_NUM_THREADS=1 ./afvslt
+
+  To add a new benchmark:
+
+  0) Add Perf::run_<name>() ABC.
+  1) Add generic templated implementation PerfT::run_<name>().
+  2) If needed, extend the generic API in namespace "vs" and AF+LT imp.
+  3) Extend the factory in perf() to call run_<name>() given a "kind" of "name".
+  4) Extend afvslt.jsonnet to include config for the new "name"
 
  */
 
@@ -21,6 +37,8 @@
 namespace vs {
     template<typename T> float to_float(const T& arr);
 
+    template<typename T> T max(const T& arr);
+    template<typename T> T min(const T& arr);
     template<typename T> T real(const T& arr);
     template<typename T> T imag(const T& arr);
     template<typename T> T fft2(const T& arr);
@@ -106,6 +124,7 @@ struct Perf {
     virtual void add(const std::string& name, const shape_type& shape, const float* data) = 0;
 
     // The tests
+    virtual json run_arith(json tst) = 0;
     virtual json run_convo(json tst) = 0;
     virtual json run_median(json tst) = 0;
     virtual json run_sort(json tst) = 0;
@@ -155,6 +174,28 @@ template<typename T>
 struct PerfT : public Perf {
 
     std::unordered_map<std::string, T> arrays;
+
+    json run_arith(json tst) {
+        TestConfig tc(tst);
+
+        add("A", tc.shape);
+        add("B", tc.shape);
+        add("C", tc.shape);
+
+        T& A = arrays["A"];
+        T& B = arrays["B"];
+        T& C = arrays["C"];
+
+        tc.go();
+
+        for (size_t count = 0; count < tc.repeat; ++count) {
+            A += B + C;
+            A += B * C;
+            A /= vs::max(A);
+        }
+        vs::sync<T>();
+        return tc.results();
+    }
 
     json run_convo(json tst) {
         TestConfig tc(tst);
@@ -285,6 +326,18 @@ float to_float<af::array>(const af::array& arr)
 }
 
 template<>
+af::array max<af::array>(const af::array& arr)
+{
+    return af::max(arr);
+}
+template<>
+af::array min<af::array>(const af::array& arr)
+{
+    return af::min(arr);
+}
+
+
+template<>
 af::array real<af::array>(const af::array& arr)
 {
     return af::real(arr);
@@ -375,6 +428,18 @@ float to_float<torch::Tensor>(const torch::Tensor& arr)
 {
     return arr.item<float>();
 }
+
+template<>
+torch::Tensor max<torch::Tensor>(const torch::Tensor& arr)
+{
+    return arr.max();
+}
+template<>
+torch::Tensor min<torch::Tensor>(const torch::Tensor& arr)
+{
+    return arr.min();
+}
+
 
 template<>
 torch::Tensor real<torch::Tensor>(const torch::Tensor& arr)
@@ -470,7 +535,10 @@ json perf(json tsts)
 
         json result;
         std::string kind = tst["kind"];
-        if (kind == "convo") {
+        if (kind == "arith") {
+            result = p->run_arith(tst);
+        }
+        else if (kind == "convo") {
             result = p->run_convo(tst);
         }
         else if (kind == "median") {
@@ -480,7 +548,7 @@ json perf(json tsts)
             result = p->run_sort(tst);
         }
         else {
-            std::cerr << "unknown test: " << tst << "\n";
+            std::cerr << "unknown test: " << kind << " config: " << tst << "\n";
         }
         json jtest;
         jtest["input"] = tst;

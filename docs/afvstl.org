@@ -83,9 +83,18 @@ The second poses problems as quantile is not implemented in AF.  However, it's c
 
 The third is excluded as it is not expected to be required (currently used to construct the "high frequency" half spectrum which could/should be included specifically).
 
+In addition, some simple element-wise arithmetic is benchmarked.
+
+Each time is an average over a number of repeats of the operation sufficient to use 1-10 seconds of total wall clock time.
+
 The results:
 
 | test   | dev | tech | time (ms) |
+|--------+-----+------+-----------|
+| arith  | GPU | AF   |      0.14 |
+| arith  | GPU | LT   |      0.36 |
+| arith  | CPU | AF   |     33.40 |
+| arith  | CPU | LT   |     11.91 |
 |--------+-----+------+-----------|
 | convo  | GPU | AF   |      2.20 |
 | convo  | GPU | LT   |      0.89 |
@@ -106,7 +115,12 @@ The results:
 This is reproduced with:
 #+begin_example
  ./spng/test/build-afvslt
- jsonnet spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt > fulltest.json
+ jsonnet spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt | ./spng/test/afvslt.py fulltest.json
+#+end_example
+
+May narrow to a subset of tests:
+#+begin_example
+ jsonnet -A tests=convo,sort -A devices=gpu -A techs=af spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt
 #+end_example
 
 

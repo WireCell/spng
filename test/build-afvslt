@@ -1,12 +1,11 @@
 #!/bin/bash
-top=$(realpath $PREFIX/..)
-echo $top
+mydir=$(dirname $(realpath $BASH_SOURCE))
 
 prog=afvslt
 export TDIR=$PREFIX/lib/python3.11/site-packages/torch
 set -x
 g++ -O2 -std=c++17 -ggdb3 \
-    -o $top/$prog $top/spng/test/${prog}.cpp \
+    -o $prog $mydir/${prog}.cpp \
     -isystem $PREFIX/include \
     -isystem PREFIX/targets/x86_64-linux/include \
     -isystem $TDIR/include \
