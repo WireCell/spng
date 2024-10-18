@@ -20,7 +20,7 @@ local shapes = [ [1024,8192], ];
 
 function(techs="af,lt", devices="gpu,cpu", tests="convo,median,sort,arith")
 [
-    perf(tech, tname, repeats[tname][dev], dev, shape)
+    perf(tech, tname, std.get(repeats[tname], dev, 10), dev, shape)
     for dev in std.split(devices,",")
     for tech in std.split(techs,",")
     for shape in shapes

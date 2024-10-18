@@ -73,6 +73,42 @@ ArrayFire documentation is plentiful and clear.  A number of high level tutorial
 
 * Performance tests
 
+** Software setup
+
+Get software and source
+
+#+begin_example
+$ wcwc view -S wirecell -d afvslt \
+   -s "arrayfire+cuda+opencl" \
+   -s "py-torch" \
+   -s "nlohmann-json" \
+   -s "go-jsonnet" \
+   afvslt/local
+$ cd afvslt && direnv allow
+$ git clone git@github.com:wirecell/spng.git
+#+end_example
+
+Build:
+
+#+begin_example
+$ ./spng/test/build-afvslt
+#+end_example
+
+Run:
+
+#+begin_example
+$ jsonnet spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt | python spng/test/afvslt.py
+#+end_example
+
+That full pipeline results in a table to paste into this document.  The set of benchmarks can be narrowed by giving arguments to the Jsonnet file such like as:
+
+#+begin_example
+$ jsonnet -A techs=af -A devices=gpu -A tests=arith spng/test/afvslt.jsonnet 
+#+end_example
+
+** Results
+
+
 The existing WCT ~OmnibusSigProc~ was examined and its three largest bottlenecks were considered for mocking in micro-benchmarks:
 
 1. Convolution via discrete Fourier transform.  

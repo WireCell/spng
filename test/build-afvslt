@@ -3,6 +3,11 @@ mydir=$(dirname $(realpath $BASH_SOURCE))
 
 prog=afvslt
 export TDIR=$PREFIX/lib/python3.11/site-packages/torch
+
+# can not get OpenCL/PoCL/ocl-icd/etc/etc/ to work
+# openclflags=$(pkg-config --libs --cflags OpenCL)
+# poclflags=$(pkg-config --libs --cflags pocl)
+
 set -x
 g++ -O2 -std=c++17 -ggdb3 \
     -o $prog $mydir/${prog}.cpp \
@@ -19,5 +24,7 @@ g++ -O2 -std=c++17 -ggdb3 \
     -Wl,--no-as-needed,"$TDIR/lib/libtorch_cpu.so" \
     -Wl,--no-as-needed,"$TDIR/lib/libtorch_cuda.so" \
     -lcudart -lcuda \
+    $openclflags \
+    $poclflags \
     -Wl,-rpath,$PREFIX/lib:$PREFIX/targets/x86_64-linux/lib:$TDIR/lib || exit 1
 

@@ -292,11 +292,20 @@ struct PerfT : public Perf {
 struct PerfAF : public PerfT<af::array> {
     
     virtual json prerun(json tst) {
-        if (getdef<std::string>(tst, "device", "cpu") == "gpu") {
+        const std::string device = getdef<std::string>(tst, "device", "cpu");
+
+        if (device == "gpu" || device == "cuda") {
             af::setBackend(AF_BACKEND_CUDA);
         }
+        // Can not get to work.
+        // else if (device == "opencl") {
+        //     af::setBackend(AF_BACKEND_OPENCL);
+        // }
+        else if (device == "cpu") {
+            af::setBackend(AF_BACKEND_CPU);
+        }
         else {
-            af::setBackend(AF_BACKEND_CPU);            
+            throw (std::runtime_error("unsupported device: " + device));
         }
         tst["tech"] = "af";
         return tst;
@@ -518,11 +527,17 @@ json perf(json tsts)
         auto tech = getdef<std::string>(tst, "tech", "af");
         std::unique_ptr<Perf> p;
 
-        if (tech == "af") {
-            p = std::make_unique<PerfAF>();
+        try {
+            if (tech == "af") {
+                p = std::make_unique<PerfAF>();
+            }
+            else if (tech == "lt") {
+                p = std::make_unique<PerfLT>();
+            }
         }
-        else if (tech == "lt") {
-            p = std::make_unique<PerfLT>();
+        catch (std::runtime_error& err) {
+            std::cerr << "skipping failed construction: " << tech << "\n" << tst << "\n";
+            continue;
         }
         if (!p) {
             std::cerr << "skipping unknown tech: " << tech << "\n" << tst << "\n";

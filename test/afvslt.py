@@ -12,8 +12,9 @@ one = infinite_defaultdict()
 try:
     fname = sys.argv[1]
 except IndexError:
-    fname = "/dev/stderr"
-for tst in json.load(open(fname)):
+    fname = "/dev/stdin"
+
+for tst in json.loads(open(fname).read()):
     inp = tst["input"]
 
     one[inp["kind"]][inp["device"]][inp["tech"]] = tst["output"]["dt"]
