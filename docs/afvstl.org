@@ -83,6 +83,7 @@ $ wcwc view -S wirecell -d afvslt \
    -s "py-torch" \
    -s "nlohmann-json" \
    -s "go-jsonnet" \
+   -s "eigen" \
    afvslt/local
 $ cd afvslt && direnv allow
 $ git clone git@github.com:wirecell/spng.git

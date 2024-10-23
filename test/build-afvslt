@@ -9,12 +9,13 @@ export TDIR=$PREFIX/lib/python3.11/site-packages/torch
 # poclflags=$(pkg-config --libs --cflags pocl)
 
 set -x
-g++ -O2 -std=c++17 -ggdb3 \
+g++ -O2 -std=c++20 -ggdb3 \
     -o $prog $mydir/${prog}.cpp \
     -isystem $PREFIX/include \
     -isystem PREFIX/targets/x86_64-linux/include \
     -isystem $TDIR/include \
     -isystem $TDIR/include/torch/csrc/api/include \
+    -isystem $PREFIX/include/eigen3 \
     -L $PREFIX/lib \
     -L $PREFIX/targets/x86_64-linux/lib \
     -L $TDIR/lib \

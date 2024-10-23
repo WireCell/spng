@@ -30,15 +30,37 @@
 // type independent.
 #define USE_ARRAYFIRE
 #define USE_LIBTORCH
+#define USE_EIGEN               // eigen to hold array but algs are fftw3 or std::
 
+#include <vector>
 
-// A small subset of technology-independent array API which are specialize for a
-// given array technology below.
+using size_type = long long;
+using shape_type = std::vector<size_type>;
+
 namespace vs {
+    // A small subset of technology-independent array API which are specialize
+    // for a given array technology below.
+    //
+    // General limitations unless commented otherwise:
+    //
+    // - The array dtype and shape of args and return value are same.
+    //
+    // - An array may be 2, 1 or 0 (scalar) dimensions of real or complex
+    // single-precision float.
+
+    // Return the "shape" of array
+    template<typename T> shape_type shape(const T& arr);
+
+    // Return the real value of the zeroth element of array 
     template<typename T> float to_float(const T& arr);
 
-    template<typename T> T max(const T& arr);
-    template<typename T> T min(const T& arr);
+    // Element-wise arith. return arr1 {+,*,/} arr2.
+    template<typename T> T add(const T& arr1, const T& arr2);
+    template<typename T> T mul(const T& arr1, const T& arr2);
+    template<typename T> T mul(const T& arr1, float val);
+
+    // Some kind of norm of the array.
+    template<typename T> float norm(const T& arr);
     template<typename T> T real(const T& arr);
     template<typename T> T imag(const T& arr);
     template<typename T> T fft2(const T& arr);
@@ -54,7 +76,6 @@ namespace vs {
 
 #include <unordered_map>
 #include <string>
-#include <vector>
 #include <fstream>
 #include <random>
 #include <iostream>
@@ -80,9 +101,6 @@ template<typename T> T getdef(json& jobj, const std::string& key, const T& def) 
     return ret;
 }
     
-using size_type = long long;
-using shape_type = std::vector<size_type>;
-
 size_type shape_size(const shape_type& shape)
 {
     size_t nele = 1;
@@ -189,9 +207,13 @@ struct PerfT : public Perf {
         tc.go();
 
         for (size_t count = 0; count < tc.repeat; ++count) {
-            A += B + C;
-            A += B * C;
-            A /= vs::max(A);
+            A = vs::add(A, vs::add(B,C));
+            A = vs::add(A, vs::mul(B,C));
+            A = vs::mul(A, 1.0/vs::norm(A));
+
+            // A += B + C;
+            // A += B * C;
+            // A /= vs::max(A);
         }
         vs::sync<T>();
         return tc.results();
@@ -221,7 +243,7 @@ struct PerfT : public Perf {
             // double dt_S = tdiffms(t);
 
             // t = now();
-            auto SR = S*R;
+            auto SR = vs::mul(S,R);
             // double dt_SR = tdiffms(t);
 
             // t = now();
@@ -235,7 +257,7 @@ struct PerfT : public Perf {
             // std::cerr << count << ": S:" << dt_S << " SR:" << dt_SR << " m:" << dt_m
             //           << " sync:" << dt_sync << " tot:" << dt << "\n";
 
-            tot += vs::real(m);
+            tot = vs::add(tot, vs::real(m));
         }
         vs::sync<T>();
 
@@ -255,8 +277,7 @@ struct PerfT : public Perf {
         tc.go();
 
         for (size_t count = 0; count < tc.repeat; ++count) {
-
-            tot += vs::median(s, 1);
+            tot = vs::add(tot, vs::median(s, 1));
         }
         vs::sync<T>();
 
@@ -276,7 +297,7 @@ struct PerfT : public Perf {
         tc.go();
 
         for (size_t count = 0; count < tc.repeat; ++count) {
-            tot += vs::sort(s, 1);
+            tot = vs::add(tot, vs::sort(s, 1));
         }
         vs::sync<T>();
 
@@ -297,7 +318,7 @@ struct PerfAF : public PerfT<af::array> {
         if (device == "gpu" || device == "cuda") {
             af::setBackend(AF_BACKEND_CUDA);
         }
-        // Can not get to work.
+        // I can not get an OpenCL stack build working.
         // else if (device == "opencl") {
         //     af::setBackend(AF_BACKEND_OPENCL);
         // }
@@ -328,6 +349,17 @@ struct PerfAF : public PerfT<af::array> {
 namespace vs {
 
 
+template<> shape_type shape(const af::array& arr)
+{
+    auto dims = arr.dims();
+    const size_t n = dims.ndims();
+    shape_type ret(n);
+    for (size_t ind=0; ind<n; ++ind) {
+        ret[ind] = dims[ind];
+    }
+    return ret;
+}
+
 template<>
 float to_float<af::array>(const af::array& arr)
 {
@@ -335,14 +367,27 @@ float to_float<af::array>(const af::array& arr)
 }
 
 template<>
-af::array max<af::array>(const af::array& arr)
+af::array add<af::array>(const af::array& arr1, const af::array& arr2)
 {
-    return af::max(arr);
+    return arr1 + arr2;
 }
+
 template<>
-af::array min<af::array>(const af::array& arr)
+af::array mul<af::array>(const af::array& arr1, const af::array& arr2)
 {
-    return af::min(arr);
+    return arr1 * arr2;
+}
+    
+template<>
+af::array mul<af::array>(const af::array& arr1, float val)
+{
+    return val*arr1;
+}
+
+template<>
+float norm<af::array>(const af::array& arr)
+{
+    return to_float(af::max(arr));
 }
 
 
@@ -432,6 +477,13 @@ struct PerfLT : public PerfT<torch::Tensor> {
 
 namespace vs {
 
+template<> shape_type shape(const torch::Tensor& arr)
+{
+    auto dims = arr.sizes();
+    shape_type ret(dims.begin(), dims.end());
+    return ret;
+}
+
 template<>
 float to_float<torch::Tensor>(const torch::Tensor& arr)
 {
@@ -439,14 +491,27 @@ float to_float<torch::Tensor>(const torch::Tensor& arr)
 }
 
 template<>
-torch::Tensor max<torch::Tensor>(const torch::Tensor& arr)
+torch::Tensor add<torch::Tensor>(const torch::Tensor& arr1, const torch::Tensor& arr2)
 {
-    return arr.max();
+    return arr1 + arr2;
 }
+
 template<>
-torch::Tensor min<torch::Tensor>(const torch::Tensor& arr)
+torch::Tensor mul<torch::Tensor>(const torch::Tensor& arr1, const torch::Tensor& arr2)
 {
-    return arr.min();
+    return arr1 * arr2;
+}
+    
+template<>
+torch::Tensor mul<torch::Tensor>(const torch::Tensor& arr1, float val)
+{
+    return val*arr1;
+}
+
+template<>
+float norm<torch::Tensor>(const torch::Tensor& arr)
+{
+    return to_float(arr.max());
 }
 
 
@@ -502,22 +567,233 @@ template<> void sync<torch::Tensor>()
 #endif  // USE_LIBTORCH
 
 
-void die(const std::string& msg) {
-    std::cerr << msg << "\n";
-    exit (1);
+#ifdef USE_EIGEN
+#include <Eigen/Core>
+#include <variant>
+#include <algorithm>
+
+namespace ei {
+    // Type mimicry of the af/lt array handle
+    
+    using scalar = float;
+    using oned = Eigen::ArrayXf;
+    using twod = Eigen::ArrayXXf;
+    using twodc = Eigen::ArrayXXcf;
+
+    using array = std::variant<float, oned, twod, twodc>;
+}
+
+struct PerfEI : public PerfT<ei::array> {
+
+    virtual json prerun(json tst) {
+        auto device = getdef<std::string>(tst, "device", "cpu");
+        if (device != "cpu") {
+            throw std::runtime_error("unsupported device: " + device);
+        }
+        tst["tech"] = "ei";
+        return tst;
+    }
+
+    virtual void add(const std::string& name, const shape_type& shape) {
+        auto data = randu(shape_size(shape));
+        return add(name, shape, data.get());
+    }
+
+    virtual void add(const std::string& name, const shape_type& shape, const float* data) {
+        const size_t ndims = shape.size();
+        if (ndims == 2) {
+            ei::twod arr = Eigen::Map<ei::twod>((float*)data, shape[0], shape[1]);
+            arrays[name] = arr;
+        }
+        else if (ndims == 1) {
+            ei::oned arr = Eigen::Map<ei::oned>((float*)data, shape[0]);
+            arrays[name] = arr;
+        }
+        throw std::runtime_error("unsupported array shape");
+    }
+
+};
+
+namespace vs {
+
+template<> shape_type shape(const ei::array& arr)
+{
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        const auto& tarr = std::get<ei::twodc>(arr);
+        return shape_type{tarr.rows(), tarr.cols()};
+    }
+    if (std::holds_alternative<ei::twod>(arr)) {
+        const auto& tarr = std::get<ei::twod>(arr);
+        return shape_type{tarr.rows(), tarr.cols()};
+    }
+    if (std::holds_alternative<ei::oned>(arr)) {
+        const auto& tarr = std::get<ei::oned>(arr);
+        return shape_type{tarr.size()};
+    }
+    return shape_type{};
 }
 
 
-int test_af(int argc, char* argv[])
+template<> float to_float<ei::array>(const ei::array& arr)
 {
-    af::array aa;
-    return 0;
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        return std::real(std::get<ei::twodc>(arr)(0,0));
+    }
+    if (std::holds_alternative<ei::twod>(arr)) {
+        return std::get<ei::twod>(arr)(0,0);
+    }
+    if (std::holds_alternative<ei::oned>(arr)) {
+        return std::get<ei::oned>(arr)(0);
+    }
+    return std::get<ei::scalar>(arr);
 }
-int test_lt(int argc, char* argv[])
+
+template<>
+ei::array add<ei::array>(const ei::array& arr1, const ei::array& arr2)
 {
-    torch::Tensor tt;
-    return 0;
+    if (std::holds_alternative<ei::twodc>(arr1)) {
+        ei::twodc ret = std::get<ei::twodc>(arr1) + std::get<ei::twodc>(arr2);
+        return ret;
+    }
+    if (std::holds_alternative<ei::twod>(arr1)) {
+        ei::twod ret = std::get<ei::twod>(arr1) + std::get<ei::twod>(arr2);
+        return ret;
+    }
+    if (std::holds_alternative<ei::oned>(arr1)) {
+        ei::oned ret = std::get<ei::oned>(arr1) + std::get<ei::oned>(arr2);
+        return ret;
+    }
+    return std::get<ei::scalar>(arr1) + std::get<ei::scalar>(arr2);
 }
+
+template<>
+ei::array mul<ei::array>(const ei::array& arr1, const ei::array& arr2)
+{
+    if (std::holds_alternative<ei::twodc>(arr1)) {
+        ei::twodc ret = std::get<ei::twodc>(arr1) * std::get<ei::twodc>(arr2);
+        return ret;
+    }
+    if (std::holds_alternative<ei::twod>(arr1)) {
+        ei::twod ret = std::get<ei::twod>(arr1) * std::get<ei::twod>(arr2);
+        return ret;
+    }
+    if (std::holds_alternative<ei::oned>(arr1)) {
+        ei::oned ret = std::get<ei::oned>(arr1) * std::get<ei::oned>(arr2);
+        return ret;
+    }
+    return std::get<ei::scalar>(arr1) * std::get<ei::scalar>(arr2);
+}
+    
+template<>
+ei::array mul<ei::array>(const ei::array& arr1, float val)
+{
+    if (std::holds_alternative<ei::twodc>(arr1)) {
+        ei::twodc ret = std::get<ei::twodc>(arr1) * val;
+        return ret;
+    }
+    if (std::holds_alternative<ei::twod>(arr1)) {
+        ei::twod ret = std::get<ei::twod>(arr1) * val;
+        return ret;
+    }
+    if (std::holds_alternative<ei::oned>(arr1)) {
+        ei::oned ret = std::get<ei::oned>(arr1) * val;
+        return ret;
+    }
+    return std::get<ei::scalar>(arr1) * val;
+}
+
+template<> float norm<ei::array>(const ei::array& arr)
+{
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        return std::get<ei::twodc>(arr).abs().maxCoeff();
+    }
+    if (std::holds_alternative<ei::twod>(arr)) {
+        return std::abs(std::get<ei::twod>(arr).maxCoeff());
+    }
+    if (std::holds_alternative<ei::oned>(arr)) {
+        return std::abs(std::get<ei::oned>(arr).maxCoeff());
+    }
+    return std::abs(std::get<ei::scalar>(arr));
+}
+
+
+template<> 
+ei::array real<ei::array>(const ei::array& arr)
+{
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        ei::twod ret = std::get<ei::twodc>(arr).real();
+        return ret;
+    }
+    return arr;
+}
+
+template<> 
+ei::array imag<ei::array>(const ei::array& arr)
+{
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        ei::twod ret = std::get<ei::twodc>(arr).imag();
+        return ret;
+    }
+    return arr;
+}
+    
+template<> 
+ei::array fft2<ei::array>(const ei::array& arr)
+{
+    return arr;
+}
+    
+template<> 
+ei::array ifft2<ei::array>(const ei::array& arr)
+{
+    return arr;
+}
+    
+template<> 
+ei::array median<ei::array>(const ei::array& arr, int /*dim*/)
+{
+    if (std::holds_alternative<ei::scalar>(arr)) {
+        return arr;
+    }
+    if (std::holds_alternative<ei::oned>(arr)) {    
+        ei::oned tarr = std::get<ei::oned>(arr); // copy as nth_element reorders
+        const size_t siz = tarr.size();
+        float* data = tarr.data();
+        const double p = 0.5;
+        size_t mid = p * siz;
+        mid = std::min(mid, siz - 1);
+        std::nth_element(data, data+mid, data+siz);
+        return *(data+mid);
+    }
+    if (std::holds_alternative<ei::twod>(arr)) {    
+        const ei::twod& tarr = std::get<ei::twod>(arr);
+        size_t nrows = tarr.rows();
+        ei::oned ret = ei::oned::Zero(nrows);
+        for (size_t irow=0; irow < nrows; ++irow) {
+            const ei::oned& row = tarr.row(irow);
+            const ei::array& rarr = row;
+            ei::array marr = median(rarr);
+            ret[irow] = std::get<ei::scalar>(marr);
+        }
+        return ret;
+    }
+
+    return arr;
+}
+    
+template<> 
+ei::array sort<ei::array>(const ei::array& arr, int /*dim*/)
+{
+    return arr;
+}
+
+template<> ei::array& eval<ei::array>(ei::array& arr) { return arr; } // no-op
+template<> void sync<ei::array>() { } // no-op
+    
+} 
+
+#endif // USE_EIGEN
+
 
 json perf(json tsts)
 {
@@ -533,6 +809,9 @@ json perf(json tsts)
             }
             else if (tech == "lt") {
                 p = std::make_unique<PerfLT>();
+            }
+            else if (tech == "ei") {
+                p = std::make_unique<PerfEI>();
             }
         }
         catch (std::runtime_error& err) {
