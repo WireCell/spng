@@ -79,8 +79,6 @@ namespace vs {
     template<typename T> T imag(const T& arr);
     template<typename T> T fft2(const T& arr);
     template<typename T> T ifft2(const T& arr);
-    template<typename T> T fft2RC(const T& rarr);
-    template<typename T> T ifft2CR(const T& carr);
     template<typename T> T median(const T& arr, int dim=0);
     template<typename T> T sort(const T& arr, int dim=0);
 
@@ -421,7 +419,13 @@ af::array imag<af::array>(const af::array& arr)
 template<>
 af::array fft2<af::array>(const af::array& arr)
 {
-    return af::fft2(arr);
+//    return af::fft2(arr);
+    auto got = af::fftR2C<2>(arr);
+    
+    auto ret = af::constant(0, arr.dims(), c32); // c32 defined in global namespace!!!
+    ret(af::seq(got.dims(0)), af::seq(got.dims(1))) = got;
+
+    return ret;
 }
 template<>
 af::array ifft2<af::array>(const af::array& arr)
