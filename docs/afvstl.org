@@ -84,6 +84,7 @@ $ wcwc view -S wirecell -d afvslt \
    -s "nlohmann-json" \
    -s "go-jsonnet" \
    -s "eigen" \
+   -s "fftw" \
    afvslt/local
 $ cd afvslt && direnv allow
 $ git clone git@github.com:wirecell/spng.git
@@ -126,28 +127,42 @@ Each time is an average over a number of repeats of the operation sufficient to 
 
 The results:
 
-| test   | dev | tech | time (ms) |
-|--------+-----+------+-----------|
-| arith  | GPU | AF   |      0.14 |
-| arith  | GPU | LT   |      0.36 |
-| arith  | CPU | AF   |     33.40 |
-| arith  | CPU | LT   |     11.91 |
-|--------+-----+------+-----------|
-| convo  | GPU | AF   |      2.20 |
-| convo  | GPU | LT   |      0.89 |
-| convo  | CPU | AF   |    667.74 |
-| convo  | CPU | LT   |    158.24 |
-|--------+-----+------+-----------|
-| median | GPU | AF   |      1.30 |
-| median | GPU | LT   |      0.18 |
-| median | CPU | AF   |   1109.09 |
-| median | CPU | LT   |     76.73 |
-|--------+-----+------+-----------|
-| sort   | GPU | AF   |      1.33 |
-| sort   | GPU | LT   |      1.55 |
-| sort   | CPU | AF   |   1119.37 |
-| sort   | CPU | LT   |    383.22 |
-|--------+-----+------+-----------|
+
+
+
+| test   | dev | tech | time (ms) | notes            |
+|--------+-----+------+-----------+------------------|
+| arith  | GPU | AF   |      0.14 |                  |
+| arith  | GPU | LT   |      0.36 |                  |
+|--------+-----+------+-----------+------------------|
+| arith  | CPU | AF   |     33.40 |                  |
+| arith  | CPU | LT   |     11.91 |                  |
+| arith  | CPU | EI   |     18.78 |                  |
+|--------+-----+------+-----------+------------------|
+|--------+-----+------+-----------+------------------|
+| convo  | GPU | AF   |      2.20 |                  |
+| convo  | GPU | LT   |      0.89 |                  |
+|--------+-----+------+-----------+------------------|
+| convo  | CPU | AF   |    667.74 |                  |
+| convo  | CPU | LT   |    158.24 |                  |
+| convo  | CPU | EI   |    489.61 | fftw3            |
+|--------+-----+------+-----------+------------------|
+|--------+-----+------+-----------+------------------|
+| median | GPU | AF   |      1.30 |                  |
+| median | GPU | LT   |      0.18 |                  |
+|--------+-----+------+-----------+------------------|
+| median | CPU | AF   |   1109.09 |                  |
+| median | CPU | LT   |     76.73 |                  |
+| median | CPU | EI   |     90.98 | ~std::nth_element~ |
+|--------+-----+------+-----------+------------------|
+|--------+-----+------+-----------+------------------|
+| sort   | GPU | AF   |      1.33 |                  |
+| sort   | GPU | LT   |      1.55 |                  |
+|--------+-----+------+-----------+------------------|
+| sort   | CPU | AF   |   1119.37 |                  |
+| sort   | CPU | LT   |    383.22 |                  |
+| sort   | CPU | EI   |    317.24 | ~std::sort~        |
+|--------+-----+------+-----------+------------------|
 
 This is reproduced with:
 #+begin_example

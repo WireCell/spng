@@ -33,9 +33,23 @@
 #define USE_EIGEN               // eigen to hold array but algs are fftw3 or std::
 
 #include <vector>
+#include <sstream>
 
 using size_type = long long;
 using shape_type = std::vector<size_type>;
+
+std::string shape_str(const shape_type& shape)
+{
+    std::stringstream ss;
+    ss << "(";
+    std::string comma = "";
+    for (const auto dim : shape) {
+        ss << comma << dim;
+        comma = " ";
+    }
+    ss << ")";
+    return ss.str();
+}
 
 namespace vs {
     // A small subset of technology-independent array API which are specialize
@@ -571,14 +585,16 @@ template<> void sync<torch::Tensor>()
 #include <Eigen/Core>
 #include <variant>
 #include <algorithm>
+#include <fftw3.h>
 
 namespace ei {
     // Type mimicry of the af/lt array handle
     
     using scalar = float;
     using oned = Eigen::ArrayXf;
-    using twod = Eigen::ArrayXXf;
-    using twodc = Eigen::ArrayXXcf;
+    // Make 2D arrays RowMajor to cheat a little in sort() and median()
+    using twod = Eigen::Array<float, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+    using twodc = Eigen::Array<std::complex<float>, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
     using array = std::variant<float, oned, twod, twodc>;
 }
@@ -609,7 +625,9 @@ struct PerfEI : public PerfT<ei::array> {
             ei::oned arr = Eigen::Map<ei::oned>((float*)data, shape[0]);
             arrays[name] = arr;
         }
-        throw std::runtime_error("unsupported array shape");
+        else {
+            throw std::runtime_error("ei::add() does not support shape " + shape_str(shape));
+        }
     }
 
 };
@@ -737,16 +755,62 @@ ei::array imag<ei::array>(const ei::array& arr)
     return arr;
 }
     
+// Note, we are penalizing fftw by not providing specialized r2c and c2r.
+using plan_type = fftwf_plan;
+using plan_val_t = fftwf_complex;
+
 template<> 
 ei::array fft2<ei::array>(const ei::array& arr)
 {
-    return arr;
+    ei::twodc tarr;
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        tarr = std::get<ei::twodc>(arr);
+    }
+    else if (std::holds_alternative<ei::twod>(arr)) {
+        auto twod = std::get<ei::twod>(arr);
+        tarr = twod.cast<std::complex<float>>();
+    }
+    else {
+        throw std::runtime_error("ei::fft2 unsupported array type");
+    }
+
+    ei::twodc tout = ei::twodc::Zero(tarr.rows(), tarr.cols());
+
+    plan_val_t* src = const_cast<plan_val_t*>( reinterpret_cast<const plan_val_t*>(tarr.data()) );
+    plan_val_t* dst = reinterpret_cast<plan_val_t*>(tout.data());
+
+    plan_type plan = fftwf_plan_dft_2d(tarr.cols(), tarr.rows(), src, dst, 
+                                       FFTW_FORWARD, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+
+    fftwf_execute_dft(plan, src, dst);
+    return tout;
 }
     
 template<> 
 ei::array ifft2<ei::array>(const ei::array& arr)
 {
-    return arr;
+    ei::twodc tarr;
+    if (std::holds_alternative<ei::twodc>(arr)) {
+        tarr = std::get<ei::twodc>(arr);
+    }
+    else if (std::holds_alternative<ei::twod>(arr)) {
+        auto twod = std::get<ei::twod>(arr);
+        tarr = twod.cast<std::complex<float>>();
+    }
+    else {
+        throw std::runtime_error("ei::fft2 unsupported array type");
+    }
+
+    ei::twodc tout = ei::twodc::Zero(tarr.rows(), tarr.cols());
+
+    plan_val_t* src = const_cast<plan_val_t*>( reinterpret_cast<const plan_val_t*>(tarr.data()) );
+    plan_val_t* dst = reinterpret_cast<plan_val_t*>(tout.data());
+
+    plan_type plan = fftwf_plan_dft_2d(tarr.cols(), tarr.rows(), src, dst, 
+                                       FFTW_BACKWARD, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+
+    fftwf_execute_dft(plan, src, dst);
+    return tout;
 }
     
 template<> 
@@ -784,7 +848,22 @@ ei::array median<ei::array>(const ei::array& arr, int /*dim*/)
 template<> 
 ei::array sort<ei::array>(const ei::array& arr, int /*dim*/)
 {
-    return arr;
+    if (std::holds_alternative<ei::oned>(arr)) {
+        ei::oned tarr = std::get<ei::oned>(arr);
+        std::sort(tarr.data(), tarr.data() + tarr.size());
+        return tarr;
+    }
+    if (std::holds_alternative<ei::twod>(arr)) {    
+        ei::twod tarr = std::get<ei::twod>(arr);
+        const size_t nrows = tarr.rows();
+        const size_t ncols = tarr.cols();
+        for (size_t irow=0; irow<nrows; ++irow) {
+            float* data = tarr.row(irow).data();
+            std::sort(data, data + ncols);
+        }
+        return tarr;
+    }
+    throw std::runtime_error("ei::sort unsupported array type");
 }
 
 template<> ei::array& eval<ei::array>(ei::array& arr) { return arr; } // no-op

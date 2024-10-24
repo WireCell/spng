@@ -18,7 +18,7 @@ local repeats = {
 
 local shapes = [ [1024,8192], ];
 
-function(techs="af,lt", devices="gpu,cpu", tests="convo,median,sort,arith")
+function(techs="af,lt,ei", devices="gpu,cpu", tests="convo,median,sort,arith")
 [
     perf(tech, tname, std.get(repeats[tname], dev, 10), dev, shape)
     for dev in std.split(devices,",")
