@@ -79,6 +79,8 @@ namespace vs {
     template<typename T> T imag(const T& arr);
     template<typename T> T fft2(const T& arr);
     template<typename T> T ifft2(const T& arr);
+    template<typename T> T fft2RC(const T& rarr);
+    template<typename T> T ifft2CR(const T& carr);
     template<typename T> T median(const T& arr, int dim=0);
     template<typename T> T sort(const T& arr, int dim=0);
 
@@ -755,35 +757,38 @@ ei::array imag<ei::array>(const ei::array& arr)
     return arr;
 }
     
-// Note, we are penalizing fftw by not providing specialized r2c and c2r.
-using plan_type = fftwf_plan;
-using plan_val_t = fftwf_complex;
-
 template<> 
 ei::array fft2<ei::array>(const ei::array& arr)
 {
-    ei::twodc tarr;
     if (std::holds_alternative<ei::twodc>(arr)) {
-        tarr = std::get<ei::twodc>(arr);
+        ei::twodc tarr = std::get<ei::twodc>(arr);
+
+        ei::twodc tout = ei::twodc::Zero(tarr.rows(), tarr.cols());
+
+        fftwf_complex* src = const_cast<fftwf_complex*>( reinterpret_cast<const fftwf_complex*>(tarr.data()) );
+        fftwf_complex* dst = reinterpret_cast<fftwf_complex*>(tout.data());
+
+        fftwf_plan plan = fftwf_plan_dft_2d(tarr.cols(), tarr.rows(), src, dst, 
+                                            FFTW_FORWARD, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+        fftwf_execute_dft(plan, src, dst);
+        return tout;
     }
-    else if (std::holds_alternative<ei::twod>(arr)) {
-        auto twod = std::get<ei::twod>(arr);
-        tarr = twod.cast<std::complex<float>>();
+    if (std::holds_alternative<ei::twod>(arr)) { // R2C
+        auto tarr = std::get<ei::twod>(arr);
+
+        ei::twodc tout = ei::twod::Zero(tarr.rows(), tarr.cols());
+
+        float* src = const_cast<float*>( reinterpret_cast<const float*>(tarr.data()) );
+        fftwf_complex* dst = reinterpret_cast<fftwf_complex*>(tout.data());
+
+        fftwf_plan plan = fftwf_plan_dft_r2c_2d(tarr.cols(), tarr.rows(), src, dst, 
+                                                FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+
+        fftwf_execute(plan); // use fftw_execute_dft_r2c() if plan was predefined on another array
+        return tout;
+
     }
-    else {
-        throw std::runtime_error("ei::fft2 unsupported array type");
-    }
-
-    ei::twodc tout = ei::twodc::Zero(tarr.rows(), tarr.cols());
-
-    plan_val_t* src = const_cast<plan_val_t*>( reinterpret_cast<const plan_val_t*>(tarr.data()) );
-    plan_val_t* dst = reinterpret_cast<plan_val_t*>(tout.data());
-
-    plan_type plan = fftwf_plan_dft_2d(tarr.cols(), tarr.rows(), src, dst, 
-                                       FFTW_FORWARD, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
-
-    fftwf_execute_dft(plan, src, dst);
-    return tout;
+    throw std::runtime_error("ei::fft2 unsupported array type");
 }
     
 template<> 
@@ -803,11 +808,11 @@ ei::array ifft2<ei::array>(const ei::array& arr)
 
     ei::twodc tout = ei::twodc::Zero(tarr.rows(), tarr.cols());
 
-    plan_val_t* src = const_cast<plan_val_t*>( reinterpret_cast<const plan_val_t*>(tarr.data()) );
-    plan_val_t* dst = reinterpret_cast<plan_val_t*>(tout.data());
+    fftwf_complex* src = const_cast<fftwf_complex*>( reinterpret_cast<const fftwf_complex*>(tarr.data()) );
+    fftwf_complex* dst = reinterpret_cast<fftwf_complex*>(tout.data());
 
-    plan_type plan = fftwf_plan_dft_2d(tarr.cols(), tarr.rows(), src, dst, 
-                                       FFTW_BACKWARD, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
+    fftwf_plan plan = fftwf_plan_dft_2d(tarr.cols(), tarr.rows(), src, dst, 
+                                        FFTW_BACKWARD, FFTW_ESTIMATE|FFTW_PRESERVE_INPUT);
 
     fftwf_execute_dft(plan, src, dst);
     return tout;
