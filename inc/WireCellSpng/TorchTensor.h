@@ -48,6 +48,9 @@ namespace WireCell {
      torch::Tensor & get_tensor_ref();
 
      TorchTensor reshape(at::IntArrayRef sizes) const;
+     void reshape_in_place(at::IntArrayRef sizes);
+
+     at::IntArrayRef get_shape() const;
 
      void to(torch::Device device) {
         the_tensor.to(device);

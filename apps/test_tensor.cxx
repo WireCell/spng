@@ -84,6 +84,13 @@ int main(int argc, char * argv[]) {
   std::cout << std::endl;
   std::cout << my_tensor << std::endl; 
   std::cout << std::endl;
+  std::cout << my_tensor.get_shape() << std::endl;
+
+  std::cout << "Reshaping in place " << std::endl;
+  my_tensor.reshape_in_place({2,4,2});
+  std::cout << my_tensor << std::endl;
+  std::cout << my_tensor.get_shape() << std::endl;
+  std::cout << std::endl;
 
   std::cout << "CUDA DEVICE COUNT: " << torch::cuda::device_count() << std::endl;
   if (torch::cuda::is_available()) {

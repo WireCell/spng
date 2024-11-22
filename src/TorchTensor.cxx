@@ -146,6 +146,14 @@ TorchTensor TorchTensor::reshape(at::IntArrayRef sizes) const {
   return TorchTensor(this->data, sizes); 
 }
 
+void TorchTensor::reshape_in_place(at::IntArrayRef sizes) {
+  this->the_tensor = this->the_tensor.reshape(sizes);
+}
+
+at::IntArrayRef TorchTensor::get_shape() const {
+  return this->the_tensor.sizes();
+}
+
 /*TorchTensor::TorchTensor(IFrame & frame) {
 
   auto traces = frame.traces();
