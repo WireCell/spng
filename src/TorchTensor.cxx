@@ -6,22 +6,26 @@ namespace WireCell {
 
 
 
-TorchTensor TorchTensorFactory::vals(float v, size_t m, size_t n) {
-  std::vector<float> input(n*m, v);
-  return TorchTensor(input, m, n);
+TorchTensor TorchTensorFactory::vals(float v, at::IntArrayRef sizes) {
+  int data_shape = 1;
+  for (const auto & size: sizes) {
+    std::cout << size << std::endl;
+    data_shape *= size;
+  }
+  std::vector<float> input(data_shape, v);
+  return TorchTensor(input, sizes);
 }
 
-TorchTensor TorchTensorFactory::zeros(size_t m, size_t n) {
-  return vals(0., m, n);
+TorchTensor TorchTensorFactory::zeros(at::IntArrayRef sizes) {
+  return vals(0., sizes);
 }
 
-TorchTensor TorchTensorFactory::ones(size_t m, size_t n) {
-  return vals(1., m, n);
+TorchTensor TorchTensorFactory::ones(at::IntArrayRef sizes) {
+  return vals(1., sizes);
 }
 
 TorchTensor::TorchTensor(const std::vector<float> & input,
-                         size_t m,
-                         size_t n,
+                         at::IntArrayRef sizes,
                          torch::Device device)
     : data(input) {
 
@@ -42,7 +46,7 @@ TorchTensor::TorchTensor(const std::vector<float> & input,
       (device == torch::kCPU ? &data[0] : device_ptr),
       //&data[0],
       //device_ptr,
-      {m, n},
+      sizes,
       options
   );
 }
@@ -138,8 +142,8 @@ std::ostream& operator<<(std::ostream& stream, const TorchTensor & tensor) {
   return stream;
 }
 
-TorchTensor TorchTensor::reshape(size_t m, size_t n) const {
-  return TorchTensor(this->data, m, n); 
+TorchTensor TorchTensor::reshape(at::IntArrayRef sizes) const {
+  return TorchTensor(this->data, sizes); 
 }
 
 /*TorchTensor::TorchTensor(IFrame & frame) {

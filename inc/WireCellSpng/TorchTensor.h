@@ -11,7 +11,7 @@ namespace WireCell {
   class TorchTensor: public IArray {
    public:
      TorchTensor(const std::vector<float> & input,
-                 size_t m, size_t n,
+                 at::IntArrayRef sizes,
                  torch::Device device=torch::kCPU);
 
      TorchTensor(torch::Tensor & input_tensor);
@@ -47,7 +47,7 @@ namespace WireCell {
      torch::Tensor get_tensor() const;
      torch::Tensor & get_tensor_ref();
 
-     TorchTensor reshape(size_t m, size_t n) const;
+     TorchTensor reshape(at::IntArrayRef sizes) const;
 
      void to(torch::Device device) {
         the_tensor.to(device);
@@ -64,9 +64,9 @@ namespace WireCell {
 
   class TorchTensorFactory {
    public:
-    static TorchTensor zeros(size_t n, size_t m);
-    static TorchTensor ones(size_t n, size_t m);
-    static TorchTensor vals(float v, size_t n, size_t m);
+    static TorchTensor zeros(at::IntArrayRef sizes);
+    static TorchTensor ones(at::IntArrayRef sizes);
+    static TorchTensor vals(float v, at::IntArrayRef sizes);
   };
 
 }

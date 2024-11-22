@@ -21,7 +21,7 @@ int main(int argc, char * argv[]) {
       12, 13, 14, 15
   };
 
-  WireCell::TorchTensor my_tensor(data, 4, 4/*, device*/);
+  WireCell::TorchTensor my_tensor(data, {4, 4}/*, device*/);
   auto tensor_copy = my_tensor.get_tensor();
   std::cout << tensor_copy << std::endl;
 
@@ -36,7 +36,7 @@ int main(int argc, char * argv[]) {
   print_vec(data);
 
   std::vector<float> data2(16, 1.);
-  WireCell::TorchTensor my_tensor2(data2, 4, 4);
+  WireCell::TorchTensor my_tensor2(data2, {4, 4});
 
   auto added = my_tensor + my_tensor2;
 
@@ -56,9 +56,9 @@ int main(int argc, char * argv[]) {
   std::cout << my_tensor.get_tensor() << std::endl;
   std::cout << "Ostream: " << my_tensor << std::endl;
 
-  std::cout << WireCell::TorchTensorFactory::zeros(3,2) << std::endl;
-  std::cout << WireCell::TorchTensorFactory::ones(3,2) << std::endl;
-  std::cout << WireCell::TorchTensorFactory::vals(7., 3,2) << std::endl;
+  std::cout << WireCell::TorchTensorFactory::zeros({3,2}) << std::endl;
+  std::cout << WireCell::TorchTensorFactory::ones({3,2}) << std::endl;
+  std::cout << WireCell::TorchTensorFactory::vals(7., {3,2}) << std::endl;
 
   std::cout << "Subtraction:" << std::endl;
   auto subbed = my_tensor - my_tensor2;
@@ -67,8 +67,8 @@ int main(int argc, char * argv[]) {
   std::cout << my_tensor2 << std::endl;
   std::cout << subbed << std::endl;
 
-  std::cout << (WireCell::TorchTensorFactory::ones(3,2) -
-                WireCell::TorchTensorFactory::ones(3,2)) << std::endl;
+  std::cout << (WireCell::TorchTensorFactory::ones({3,2}) -
+                WireCell::TorchTensorFactory::ones({3,2})) << std::endl;
 
   std::cout << "x2" << std::endl;
   std::cout << my_tensor * 2 << std::endl;
@@ -80,7 +80,7 @@ int main(int argc, char * argv[]) {
 
 
   std::cout << "Testing reshape" << std::endl;
-  std::cout << my_tensor.reshape(2,8) << std::endl; 
+  std::cout << my_tensor.reshape({2,8}) << std::endl; 
   std::cout << std::endl;
   std::cout << my_tensor << std::endl; 
   std::cout << std::endl;
