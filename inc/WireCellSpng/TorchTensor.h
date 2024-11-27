@@ -53,7 +53,7 @@ namespace WireCell {
      at::IntArrayRef get_shape() const;
 
      void to(torch::Device device) {
-        the_tensor.to(device);
+        the_tensor = the_tensor.to(device);
      };
 
      friend std::ostream& operator<<(std::ostream& stream, const TorchTensor & tensor);

@@ -9,10 +9,10 @@ void print_vec(const std::vector<float> & data) {
 
 int main(int argc, char * argv[]) {
 
-  /*torch::Device device = torch::kCPU;
+  torch::Device device = torch::kCPU;
   if (argc > 1) {
     device = torch::kCUDA;
-  }*/
+  }
 
   std::vector<float> data = {
       0,  1,  2,  3,
@@ -21,7 +21,7 @@ int main(int argc, char * argv[]) {
       12, 13, 14, 15
   };
 
-  WireCell::TorchTensor my_tensor(data, {4, 4}/*, device*/);
+  WireCell::TorchTensor my_tensor(data, {4, 4}, device);
   auto tensor_copy = my_tensor.get_tensor();
   std::cout << tensor_copy << std::endl;
 
@@ -36,7 +36,7 @@ int main(int argc, char * argv[]) {
   print_vec(data);
 
   std::vector<float> data2(16, 1.);
-  WireCell::TorchTensor my_tensor2(data2, {4, 4});
+  WireCell::TorchTensor my_tensor2(data2, {4, 4}, device);
 
   auto added = my_tensor + my_tensor2;
 
