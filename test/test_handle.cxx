@@ -49,6 +49,23 @@ int main(int argc, char * argv[]) {
   std::cout << "clone 1" << std::endl << from_handle1 << std::endl;
   std::cout << "clone 2" << std::endl << from_handle2 << std::endl;
 
+  WireCell::TorchTensorHandle handle2(data, {4,4}, device);
+
+  auto from_handle3 = handle2.clone_tensor();
+  std::cout << "clone 3" << std::endl << from_handle3 << std::endl;
+
+
+  std::vector<int> data_int = {
+      0,  1,  2,  3,
+      4,  5,  6,  7,
+      8,  9, 10, 11,
+      12, 13, 14, 15
+  };
+
+  WireCell::TorchTensorHandle int_handle(data_int, {4,4}, device);
+  std::cout << "int handle:\n" << int_handle.clone_tensor() << std::endl;
+
+
   return 0;
 
 }
