@@ -10,11 +10,11 @@
 
 namespace WireCell {
 namespace SPNG {
-    class SPNGSigProc : public Aux::Logger,
+    class SigProc : public Aux::Logger,
                         public WireCell::ITorchTensorFilter, public WireCell::IConfigurable {
     public:
-        SPNGSigProc( );
-        virtual ~SPNGSigProc();
+        SigProc( );
+        virtual ~SigProc();
 
         virtual bool operator()(const input_pointer& in, output_pointer& out);
         virtual void configure(const WireCell::Configuration& config) {};

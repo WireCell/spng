@@ -1,22 +1,22 @@
-#include "WireCellSpng/SPNGSigProc.h"
+#include "WireCellSpng/SigProc.h"
 #include "WireCellUtil/NamedFactory.h"
 #include "WireCellUtil/Exceptions.h"
 #include "WireCellSpng/SimpleTorchTensor.h"
 
-WIRECELL_FACTORY(SPNGSigProc, WireCell::SPNG::SPNGSigProc,
+WIRECELL_FACTORY(SPNGSigProc, WireCell::SPNG::SigProc,
                  WireCell::INamed,
                  WireCell::ITorchTensorFilter, WireCell::IConfigurable)
 
-WireCell::SPNG::SPNGSigProc::SPNGSigProc()
+WireCell::SPNG::SigProc::SigProc()
   : Aux::Logger("SPNGSigProc", "spng") {
     // get wires for each plane
 
     // std::cout << m_anode->channels().size() << " " << nwire_u << " " << nwire_v << " " << nwire_w << std::endl;
 }
 
-WireCell::SPNG::SPNGSigProc::~SPNGSigProc() {};
+WireCell::SPNG::SigProc::~SigProc() {};
 
-bool WireCell::SPNG::SPNGSigProc::operator()(const input_pointer& in, output_pointer& out) {
+bool WireCell::SPNG::SigProc::operator()(const input_pointer& in, output_pointer& out) {
     
     //Get the cloned tensor from the input
     auto tensor_clone = in->tensor();
