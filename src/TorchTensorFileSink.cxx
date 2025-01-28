@@ -3,7 +3,7 @@
 
 #include "WireCellUtil/NamedFactory.h"
 
-WIRECELL_FACTORY(TorchTensorFileSink, WireCell::SPNG::TorchTensorFileSink,
+WIRECELL_FACTORY(SPNGTorchTensorFileSink, WireCell::SPNG::TorchTensorFileSink,
                  WireCell::INamed,
                  WireCell::ITorchTensorSetSink,
                  WireCell::ITerminal,
@@ -13,7 +13,7 @@ using namespace WireCell;
 using namespace WireCell::SPNG;
 
 TorchTensorFileSink::TorchTensorFileSink()
-    : Aux::Logger("TorchTensorFileSink", "spng")
+    : Aux::Logger("SPNGTorchTensorFileSink", "spng")
 {
 }
 

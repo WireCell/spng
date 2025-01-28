@@ -20,7 +20,7 @@ using namespace WireCell::String;
 
 
 TorchTensorFileSource::TorchTensorFileSource()
-    : Aux::Logger("TensorFileSource", "spng")
+    : Aux::Logger("SPNGTorchTensorFileSource", "spng")
 {
 }
 
@@ -41,19 +41,16 @@ void TorchTensorFileSource::configure(const WireCell::Configuration& cfg)
 {
     m_inname = get(cfg, "inname", m_inname);
     m_prefix = get(cfg, "prefix", m_prefix);
-
     m_in.clear();
     input_filters(m_in, m_inname);
     if (m_in.empty()) {
         THROW(ValueError() << errmsg{"TorchTensorFileSource: unsupported inname: " + m_inname});
     }
-
     log->debug("reading file={} with prefix={}", m_inname, m_prefix);
 }
 
 void TorchTensorFileSource::finalize()
-{
-}
+{}
 
 /*
   <prefix>tensorset_<ident>_metadata.json 
@@ -211,8 +208,9 @@ struct TTFSTensor : public WireCell::ITorchTensor {
 
 ITorchTensorSet::pointer TorchTensorFileSource::load()
 {
-    int ident = -1;
 
+    log->debug("Loading");
+    int ident = -1;
     Configuration setmd;
 
     struct TorchTenInfo {
@@ -224,13 +222,14 @@ ITorchTensorSet::pointer TorchTensorFileSource::load()
     while (true) {
 
         // log->debug("loop file={} size={}", m_cur.fname, m_cur.fsize);
-
         if (m_cur.fsize == 0) {
             clear();
+            // std::cout << m_in.rdbuf() << std::endl;
             custard::read(m_in, m_cur.fname, m_cur.fsize);
+            log->debug("Fname: {}", m_cur.fname);
             if (m_in.eof()) {
-                // log->debug("call={}, read stream EOF from file={}",
-                //            m_count, m_inname);
+                log->debug("call={}, read stream EOF from file={}",
+                           m_count, m_inname);
                 break;
             }
             if (!m_cur.fsize) {
@@ -245,6 +244,7 @@ ITorchTensorSet::pointer TorchTensorFileSource::load()
             }
         }
 
+        log->debug("Parsing {}{}", m_prefix, m_cur.fname);
         auto pf = parse_fname(m_cur.fname, m_prefix);
 
         // log->debug("read file={} size={} type={} form={} ident={} index={}",
@@ -309,6 +309,7 @@ void TorchTensorFileSource::clear()
 
 bool TorchTensorFileSource::operator()(ITorchTensorSet::pointer &out)
 {
+
     out = nullptr;
     if (m_eos_sent) {
         log->debug("past EOS at call={}", m_count++);
