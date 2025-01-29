@@ -3,7 +3,7 @@
 
 #include "WireCellSpng/ITorchTensorSet.h"
 
-namespace WireCell::Aux {
+namespace WireCell::SPNG {
 
     class SimpleTorchTensorSet : public WireCell::ITorchTensorSet {
       public:
@@ -33,6 +33,6 @@ namespace WireCell::Aux {
         ITorchTensor::shared_vector m_tv;
     };
 
-}  // namespace WireCell::Aux
+}  // namespace WireCell::SPNG
 
 #endif

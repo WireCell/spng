@@ -6,7 +6,7 @@ function() {
         type: 'TensorFileSource',
         name: 'ttfsource',
         data: {
-            inname: 'test.tar',
+            inname: 'testout2.tar',
         },
     }, nin=0, nout=1),
     local frame_sink = g.pnode({
