@@ -1,7 +1,7 @@
-#ifndef WIRECELL_SPNG_FRAMETOTENSOR
-#define WIRECELL_SPNG_FRAMETOTENSOR
+#ifndef WIRECELL_SPNG_FRAMETOTORCH
+#define WIRECELL_SPNG_FRAMETOTORCH
 
-#include "WireCellSpng/IFrameToTensor.h"
+#include "WireCellSpng/IFrameToTorch.h"
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellUtil/TagRules.h"
 #include "WireCellAux/Logger.h"
@@ -11,12 +11,12 @@ namespace WireCell {
 
         /// Convert 1 frame to 1 TorchTensor
         /// TODO -- Flesh out description
-        class FrameToTensor : public Aux::Logger,
-                              public IFrameToTensor, public IConfigurable {
+        class FrameToTorch : public Aux::Logger,
+                              public IFrameToTorch, public IConfigurable {
            public:
-            FrameToTensor()
-             : Aux::Logger("FrameToTensor", "spng") {};
-            virtual ~FrameToTensor() {};
+            FrameToTorch()
+             : Aux::Logger("FrameToTorch", "spng") {};
+            virtual ~FrameToTorch() {};
 
             // INode, override because we get multiplicity at run time.
             // virtual std::vector<std::string> output_types() {return };

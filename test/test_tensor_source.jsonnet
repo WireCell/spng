@@ -14,7 +14,7 @@ function() {
         name: 'ttfsink',
         data: {
             outname: 'testout.npy',
-            prefix: './'
+            prefix: ''
         },
     }, nin=1, nout=0),
 local sig_proc = g.pnode({

@@ -11,7 +11,7 @@
 namespace WireCell {
 namespace SPNG {
     class SigProc : public Aux::Logger,
-                        public WireCell::ITorchTensorFilter, public WireCell::IConfigurable {
+                    public WireCell::ITorchTensorFilter, public WireCell::IConfigurable {
     public:
         SigProc( );
         virtual ~SigProc();

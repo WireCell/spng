@@ -1,5 +1,5 @@
-#ifndef WIRECELL_SPNG_IFRAMETOTENSOR
-#define WIRECELL_SPNG_IFRAMETOTENSOR
+#ifndef WIRECELL_SPNG_IFRAMETOTORCH
+#define WIRECELL_SPNG_IFRAMETOTORCH
 
 #include "WireCellIface/IFunctionNode.h"
 #include "WireCellIface/IFrame.h"
@@ -11,11 +11,11 @@ namespace SPNG {
      * TorchTensor.
 
      */
-    class IFrameToTensor : public IFunctionNode<IFrame, ITorchTensor> {
+    class IFrameToTorch : public IFunctionNode<IFrame, ITorchTensor> {
        public:
-        virtual ~IFrameToTensor() {};
+        virtual ~IFrameToTorch() {};
 
-        virtual std::string signature() { return typeid(IFrameToTensor).name(); }
+        virtual std::string signature() { return typeid(IFrameToTorch).name(); }
 
         // Subclass must implement:
         // virtual std::vector<std::string> output_types() = 0;
