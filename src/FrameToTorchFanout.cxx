@@ -25,20 +25,40 @@ WireCell::Configuration SPNG::FrameToTorchFanout::default_configuration() const
 void SPNG::FrameToTorchFanout::configure(const WireCell::Configuration& config)
 {
     //Fill the wires per-plane
-    std::cout << "Checking planes" << std::endl;
+    log->debug("Checking planes");
     if (config.isMember("planes")) {
-        std::cout << "Got {} planes" << config["planes"] << std::endl;
+        log->debug("Got {} planes", config["planes"]);
         for (auto nwires : config["planes"]) { 
-            std::cout << "\tGot {} nwires" << nwires.asInt() << std::endl;
+            log->debug("\tGot {} nwires", nwires.asInt());
             m_planes.push_back(nwires.asInt());
         }
     }
 
-    std::cout << "Getting ticks & mult" << std::endl;
+    
+    //Fill the wires per-plane
+    log->debug("Getting the channel map");
+    if (config.isMember("channel_ranges")) {
+        log->debug("Got {} channels", config["channel_ranges"]);
+        for (auto ranges : config["channel_ranges"]) {
+            // if (ranges.size() != 2) {
+            // }
+            auto plane = ranges[0].asUInt64();
+            m_channel_ranges[plane] = std::vector<std::pair<size_t, size_t>>();
+            for (auto range : ranges[1]) {
+                log->debug("Range: {}", range);
+                m_channel_ranges[plane].emplace_back(
+                    range[0].asUInt64(), range[1].asUInt64()
+                );
+            }
+            log->debug("Plane {}", ranges.size());
+        }
+    }
+
+    log->debug("Getting ticks & mult");
     m_expected_nticks = get(config, "expected_nticks", m_expected_nticks);
-    std::cout << "Got {}" << m_expected_nticks << std::endl;
+    log->debug("Got {}", m_expected_nticks);
     m_multiplicity = get(config, "multiplicity", m_multiplicity);
-    std::cout << "Got {}" << m_multiplicity << std::endl;
+    log->debug("Got {}", m_multiplicity);
 }
 
 std::vector<std::string> SPNG::FrameToTorchFanout::output_types()
@@ -89,12 +109,37 @@ bool SPNG::FrameToTorchFanout::operator()(const input_pointer& in, output_vector
 
     // torch::Tensor plane_tensor = torch::zeros({ntraces, nticks});
     for (size_t i = 0; i < ntraces; ++i) {
-        auto chan = (*in->traces())[0]->channel();
-        log->debug("Trace {}, Channel {}", i, chan);
-        // auto nticks = (*in->traces())[0]->charge().size();
-        // for (size_t j = 0; j < nticks; ++j) {
-        //     plane_tensor.index_put_({(int64_t)i, (int64_t)j}, (*in->traces())[i]->charge()[j]);
-        // }    
+        auto chan = (*in->traces())[i]->channel();
+        int in_tensor_chan = 0;
+        size_t this_plane = 0;
+
+        bool found = false;
+
+        //Loop over the ranges and see where this channel falls
+        for (const auto & [plane, ranges] : m_channel_ranges) {
+            size_t in_tensor_start = 0;
+            for (const auto & range : ranges) {
+                if (chan >= range.first && chan < range.second) {
+                    this_plane = plane;
+                    found = true;
+                    in_tensor_chan = in_tensor_start + (chan - range.first);
+                    break;
+                }
+                in_tensor_start += (range.second - range.first);
+            }
+        }
+
+        //TODO -- configure Allow continue or throw
+        if (!found) {
+            continue;
+        }
+
+        //This is really inefficient
+        auto nticks = (*in->traces())[i]->charge().size();
+        for (size_t j = 0; j < nticks; ++j) {
+            outv[this_plane]->tensor().index_put_({(int)in_tensor_chan, (int)j}, (*in->traces())[i]->charge()[j]);
+            // plane_tensor.index_put_({(int64_t)i, (int64_t)j}, (*in->traces())[i]->charge()[j]);
+        }
     }
 
     return true;

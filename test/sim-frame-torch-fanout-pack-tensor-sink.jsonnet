@@ -116,6 +116,13 @@ local frame_to_torch_fanout = g.pnode({
     planes: [800, 800, 960],
     expected_nticks: 6000,
     multiplicity: 3,
+
+    channel_ranges: [
+      [2, [[0,480], [2080, 2560]]],
+      [0, [[480, 1280]]],
+      [1, [[1280, 2080]]],
+    ]
+
   }
 }, nin=1, nout=3);
 
