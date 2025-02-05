@@ -18,12 +18,16 @@ WireCell::Configuration SPNG::FrameToTorchFanout::default_configuration() const
 {
     Configuration cfg;
     cfg["Test"] = true;
+    cfg["anode"] = m_anode_tn;
     //What to do with planes?
     return cfg;
 }
 
 void SPNG::FrameToTorchFanout::configure(const WireCell::Configuration& config)
 {
+    
+    m_anode_tn = get(config, "anode", m_anode_tn);
+    m_anode = Factory::find_tn<IAnodePlane>(m_anode_tn);
     //Fill the wires per-plane
     log->debug("Checking planes");
     if (config.isMember("planes")) {
@@ -85,6 +89,7 @@ bool SPNG::FrameToTorchFanout::operator()(const input_pointer& in, output_vector
         return true;
     }
 
+
     //Exit if no traces
     const size_t ntraces = in->traces()->size();
     log->debug("Ntraces: {}", ntraces);
@@ -93,7 +98,24 @@ bool SPNG::FrameToTorchFanout::operator()(const input_pointer& in, output_vector
         return true;
     }
 
+    std::cout << "Checking frame tags" << std::endl;
+    for (const auto & tag : in->frame_tags()) {
+        std::cout << tag << std::endl;
+    }
+    std::cout << "Checking trace tags" << std::endl;
+    for (const auto & tag : in->trace_tags()) {
+        std::cout << tag << std::endl;
+    }
 
+
+    for (auto face : m_anode->faces()) {
+        if (!face) {   // A null face means one sided AnodePlane.
+            continue;  // Can be "back" or "front" face.
+        }
+        for (auto plane : face->planes()) {
+            std::cout << plane << std::endl;
+        }
+    }
     //Build up Tensors according to the planes
     for (size_t i = 0; i < m_planes.size(); ++i) {
         const auto & nwires = m_planes[i];

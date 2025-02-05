@@ -107,24 +107,29 @@ local parallel_pipes = [
   for n in std.range(0, std.length(tools.anodes) - 1)
 ];
 local outtags = ['raw%d' % n for n in std.range(0, std.length(tools.anodes) - 1)];
+
 local parallel_graph = f.fanpipe('DepoSetFanout', parallel_pipes, 'FrameFanin', 'sn_mag_nf', outtags);
+local depo_sn_nf_fanout = g.fan.fanout('DepoSetFanout', parallel_pipes, 'sn_mag_nf');
 
+local tf_maker = import 'torch.jsonnet';
+local tf = tf_maker(tools);
+local tf_fans = [tf.make_fanout(a) for a in tools.anodes];
 
-local frame_to_torch_fanout = g.pnode({
-  type: "FrameToTorchFanout",
-  data: {
-    planes: [800, 800, 960],
-    expected_nticks: 6000,
-    multiplicity: 3,
+// local frame_to_torch_fanout = g.pnode({
+//   type: "FrameToTorchFanout",
+//   data: {
+//     planes: [800, 800, 960],
+//     expected_nticks: 6000,
+//     multiplicity: 3,
 
-    channel_ranges: [
-      [2, [[0,480], [2080, 2560]]],
-      [0, [[480, 1280]]],
-      [1, [[1280, 2080]]],
-    ]
+//     channel_ranges: [
+//       [2, [[0,480], [2080, 2560]]],
+//       [0, [[480, 1280]]],
+//       [1, [[1280, 2080]]],
+//     ]
 
-  }
-}, nin=1, nout=3);
+//   }
+// }, nin=1, nout=3);
 
 local tensor_sink = g.pnode({
     type: 'TensorFileSink',
@@ -134,6 +139,19 @@ local tensor_sink = g.pnode({
         prefix: ''
     },
 }, nin=1, nout=0);
+
+
+local tensor_sinks = [
+   g.pnode({
+    type: 'TensorFileSink',
+    name: 'tfsink%d' % n,
+    data: {
+        outname: 'testout_fan%d.tar' % n,
+        prefix: ''
+    },
+   }, nin=1, nout=0) for n in std.range(0, std.length(tools.anodes) - 1)
+];
+
 //local frameio = io.numpy.frames(output);
 // local sink = frame_sink;
 // local graph = g.pipeline([depos, drifter, bagger, parallel_graph, sink]);
@@ -146,11 +164,25 @@ local torch_packer = g.pnode({
   },
 }, nin=3, nout=1);
 
+local torch_packers = [g.pnode({
+  type: 'TorchPacker',
+  name: 'torchpacker%d' % n,
+  data: {
+    'multiplicity': 3
+  },
+}, nin=3, nout=1) for n in std.range(0, std.length(tools.anodes)-1)];
+
 local torch_to_tensor = g.pnode({
   type: 'TorchToTensor',
   name: 'torchtotensor',
   data: {},
 }, nin=1, nout=1);
+
+local torch_to_tensors = [g.pnode({
+  type: 'TorchToTensor',
+  name: 'torchtotensor%d' % n,
+  data: {},
+}, nin=1, nout=1) for n in std.range(0, std.length(tools.anodes) - 1)];
 
 // local spng_sigproc = g.pnode({
 //   type: 'SPNGSigProc',
@@ -158,32 +190,97 @@ local torch_to_tensor = g.pnode({
 //   data: {}
 // }, nin=1, nout=1);
 
-local e0 = g.edge(frame_to_torch_fanout, torch_packer, 0, 0);
-local e1 = g.edge(frame_to_torch_fanout, torch_packer, 1, 1);
-local e2 = g.edge(frame_to_torch_fanout, torch_packer, 2, 2);
+// local e0 = g.edge(frame_to_torch_fanout, torch_packer, 0, 0);
+// local e1 = g.edge(frame_to_torch_fanout, torch_packer, 1, 1);
+// local e2 = g.edge(frame_to_torch_fanout, torch_packer, 2, 2);
 
-local connector = g.intern(
-  innodes = [frame_to_torch_fanout],
-  outnodes = [torch_packer],
-  edges = [e0, e1, e2],
+
+// local connector = g.intern(
+//   innodes = [frame_to_torch_fanout],
+//   outnodes = [torch_packer],
+//   edges = [e0, e1, e2],
+// );
+
+#4 x 3-->1
+local tfs_to_packers = g.intern(
+  innodes = tf_fans,
+  outnodes = torch_packers,
+  edges =  [
+    g.edge(tf_fans[0], torch_packers[0], 0, 0),
+    g.edge(tf_fans[0], torch_packers[0], 1, 1),
+    g.edge(tf_fans[0], torch_packers[0], 2, 2),
+    g.edge(tf_fans[1], torch_packers[1], 0, 0),
+    g.edge(tf_fans[1], torch_packers[1], 1, 1),
+    g.edge(tf_fans[1], torch_packers[1], 2, 2),
+    g.edge(tf_fans[2], torch_packers[2], 0, 0),
+    g.edge(tf_fans[2], torch_packers[2], 1, 1),
+    g.edge(tf_fans[2], torch_packers[2], 2, 2),
+    g.edge(tf_fans[3], torch_packers[3], 0, 0),
+    g.edge(tf_fans[3], torch_packers[3], 1, 1),
+    g.edge(tf_fans[3], torch_packers[3], 2, 2)
+  ]
 );
 
-local graph = g.pipeline([
-  depos, drifter, bagger, parallel_graph,
-  // frame_to_torch_fanout,
-  // // // spng_sigproc,
-  // torch_packer,
-  connector,
-  torch_to_tensor,
-  tensor_sink,
-]);
+local tfs_to_packers_to_sinks = g.intern(
+    innodes=[tfs_to_packers],
+    centernodes=torch_to_tensors,
+    outnodes=tensor_sinks,
+    edges=[
+      g.edge(tfs_to_packers, torch_to_tensors[0], 0),
+      g.edge(tfs_to_packers, torch_to_tensors[1], 1),
+      g.edge(tfs_to_packers, torch_to_tensors[2], 2),
+      g.edge(tfs_to_packers, torch_to_tensors[3], 3),
+      g.edge(torch_to_tensors[0], tensor_sinks[0]),
+      g.edge(torch_to_tensors[1], tensor_sinks[1]),
+      g.edge(torch_to_tensors[2], tensor_sinks[2]),
+      g.edge(torch_to_tensors[3], tensor_sinks[3]),
+    ],
+);
+
+// local graph = g.pipeline([
+//   depos, drifter, bagger, parallel_graph,
+//   // frame_to_torch_fanout,
+//   // // // spng_sigproc,
+//   // torch_packer,
+//   connector,
+//   torch_to_tensor,
+//   tensor_sink,
+// ]);
 
 
+
+local depos_to_fanout = g.intern(
+  innodes=[depos],
+  centernodes=[drifter, bagger], 
+  outnodes=[depo_sn_nf_fanout],
+  edges = [
+    g.edge(depos, drifter),
+    g.edge(drifter, bagger),
+    g.edge(bagger, depo_sn_nf_fanout),
+  ]
+);
+
+local new_graph = g.intern(
+  innodes=[depos_to_fanout],
+  // outnodes=[to_sinks],
+  outnodes=[tfs_to_packers_to_sinks],
+  centernodes=[],
+  edges = [
+    g.edge(depos_to_fanout, tfs_to_packers_to_sinks, 0, 0),
+    g.edge(depos_to_fanout, tfs_to_packers_to_sinks, 1, 1),
+    g.edge(depos_to_fanout, tfs_to_packers_to_sinks, 2, 2),
+    g.edge(depos_to_fanout, tfs_to_packers_to_sinks, 3, 3),
+    // g.edge(depos_to_fanout, to_sinks[0], 0, 0),
+    // g.edge(depos_to_fanout, to_sinks[1], 0, 0),
+    // g.edge(depos_to_fanout, to_sinks[2], 0, 0),
+    // g.edge(depos_to_fanout, to_sinks[3], 0, 0),
+  ]
+);
 
 local app = {
   type: 'Pgrapher',
   data: {
-    edges: g.edges(graph),
+    edges: g.edges(new_graph),
   },
 };
 
@@ -197,6 +294,5 @@ local cmdline = {
     }
 };
 
-
 // Finally, the configuration sequence which is emitted.
-[cmdline] + g.uses(graph) + [app]
+[cmdline] + g.uses(new_graph) + [app]

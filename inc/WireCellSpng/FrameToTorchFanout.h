@@ -5,6 +5,7 @@
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellUtil/Logging.h"
 #include "WireCellAux/Logger.h"
+#include "WireCellIface/IAnodePlane.h"
 
 namespace WireCell {
     namespace SPNG {
@@ -33,6 +34,9 @@ namespace WireCell {
             //Wires per Plane per APA
             std::vector<int> m_planes;
 
+            
+            std::string m_anode_tn{"AnodePlane"};
+            IAnodePlane::pointer m_anode;
             //Expected number of ticks in each readout frame
             int m_expected_nticks{-1};
 
