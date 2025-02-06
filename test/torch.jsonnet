@@ -24,15 +24,8 @@ function(tools, override = {}) {
             else name,
         data: {
             anode: wc.tn(anode),
-            planes: [800, 800, 960],
             expected_nticks: 6000,
-            // multiplicity: 3,
 
-            // channel_ranges: [
-            //     [2, [[0,480], [2080, 2560]]],
-            //     [0, [[480, 1280]]],
-            //     [1, [[1280, 2080]]],
-            // ],
             output_groups: [
                 [wc.WirePlaneId(wc.Ulayer, 0, anode.data.ident),
                  wc.WirePlaneId(wc.Ulayer, 1, anode.data.ident)],
