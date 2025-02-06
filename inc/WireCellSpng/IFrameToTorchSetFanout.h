@@ -1,21 +1,21 @@
-#ifndef WIRECELL_SPNG_IFRAMETOTORCHFANOUT
-#define WIRECELL_SPNG_IFRAMETOTORCHFANOUT
+#ifndef WIRECELL_SPNG_IFRAMETOTORCHSETFANOUT
+#define WIRECELL_SPNG_IFRAMETOTORCHSETFANOUT
 
 #include "WireCellIface/IFanoutNode.h"
 #include "WireCellIface/IFrame.h"
-#include "WireCellSpng/ITorchTensor.h"
+#include "WireCellSpng/ITorchTensorSet.h"
 
 namespace WireCell {
 namespace SPNG {
     /** A frame fan-out component takes 1 input frame and produces one
-     * TorchTensor.
+     * TorchTensorSet.
 
      */
-    class IFrameToTorchFanout : public IFanoutNode<IFrame, ITorchTensor, 0> {
+    class IFrameToTorchSetFanout : public IFanoutNode<IFrame, ITorchTensorSet, 0> {
        public:
-        virtual ~IFrameToTorchFanout() {};
+        virtual ~IFrameToTorchSetFanout() {};
 
-        virtual std::string signature() { return typeid(IFrameToTorchFanout).name(); }
+        virtual std::string signature() { return typeid(IFrameToTorchSetFanout).name(); }
 
         // Subclass must implement:
         virtual std::vector<std::string> output_types() = 0;

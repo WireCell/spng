@@ -1,22 +1,23 @@
-#ifndef WIRECELL_SPNG_FRAMETOTORCHFANOUT
-#define WIRECELL_SPNG_FRAMETOTORCHFANOUT
+#ifndef WIRECELL_SPNG_FRAMETOTORCHSETFANOUT
+#define WIRECELL_SPNG_FRAMETOTORCHSETFANOUT
 
-#include "WireCellSpng/IFrameToTorchFanout.h"
+#include "WireCellSpng/IFrameToTorchSetFanout.h"
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellUtil/Logging.h"
 #include "WireCellAux/Logger.h"
 #include "WireCellIface/IAnodePlane.h"
+#include "WireCellIface/WirePlaneId.h"
 
 namespace WireCell {
     namespace SPNG {
 
         // Fan out 1 frame to N set at construction or configuration time.
-        class FrameToTorchFanout
+        class FrameToTorchSetFanout
             : public Aux::Logger,
-              public IFrameToTorchFanout, public IConfigurable {
+              public IFrameToTorchSetFanout, public IConfigurable {
            public:
-            FrameToTorchFanout();
-            virtual ~FrameToTorchFanout() {};
+            FrameToTorchSetFanout();
+            virtual ~FrameToTorchSetFanout() {};
 
             // INode, override because we get multiplicity at run time.
             virtual std::vector<std::string> output_types();
@@ -31,10 +32,15 @@ namespace WireCell {
            private:
             int m_multiplicity;
 
-            //Wires per Plane per APA
-            std::vector<int> m_planes;
+            //Wire Planes to pack together into an output TorchTensorSet
+            std::map<const WirePlaneId, int> m_output_groups;
+            //How many wires in the TorchTensor in the ith output
+            std::map<int, int> m_output_nwires;
 
-            
+            //Channel Map
+            std::unordered_map<int, int> m_channel_map;
+            std::unordered_map<int, int> m_channel_to_output_group;
+
             std::string m_anode_tn{"AnodePlane"};
             IAnodePlane::pointer m_anode;
             //Expected number of ticks in each readout frame
