@@ -18,9 +18,7 @@ using namespace WireCell;
 WireCell::Configuration SPNG::FrameToTorchSetFanout::default_configuration() const
 {
     Configuration cfg;
-    cfg["Test"] = true;
     cfg["anode"] = m_anode_tn;
-    //What to do with planes?
     return cfg;
 }
 
@@ -31,14 +29,12 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
     m_anode = Factory::find_tn<IAnodePlane>(m_anode_tn);
 
 
-    log->debug("Getting ticks & mult");
     m_expected_nticks = get(config, "expected_nticks", m_expected_nticks);
     log->debug("Got {}", m_expected_nticks);
     // m_multiplicity = get(config, "multiplicity", m_multiplicity);
     // log->debug("Got {}", m_multiplicity);
 
     //Get output groups (map WirePlaneId --> output index)
-    log->debug("Getting the output groups");
     if (config.isMember("output_groups")) {
         auto groups = config["output_groups"];
         int i = 0;
@@ -74,10 +70,10 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
 
                 //Within a given plane, the traces will be in order as they were
                 //seen here. We have a map to determine what the output
-                //size (nwires) is when we make the tensors later.
+                //size (nchannels) is when we make the tensors later.
                 //When first accessed with [] it will put in zero.
                 //Using obj++ returns the original obj value before incrementing.
-                m_channel_map[channel->ident()] = m_output_nwires[out_group]++;
+                m_channel_map[channel->ident()] = m_output_nchannels[out_group]++;
             }
         }
     }
@@ -118,15 +114,6 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         return true;
     }
 
-    std::cout << "Checking frame tags" << std::endl;
-    for (const auto & tag : in->frame_tags()) {
-        std::cout << tag << std::endl;
-    }
-    std::cout << "Checking trace tags" << std::endl;
-    for (const auto & tag : in->trace_tags()) {
-        std::cout << tag << std::endl;
-    }
-
 
     for (auto face : m_anode->faces()) {
         if (!face) {   // A null face means one sided AnodePlane.
@@ -141,11 +128,10 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     std::vector<at::TensorAccessor<float,2>> accessors;
     std::vector<torch::Tensor> tensors;
     //Build up tenors + accessors to store input trace values
-    for (const auto & [out_group, nwires] : m_output_nwires) {
+    for (const auto & [out_group, nchannels] : m_output_nchannels) {
 
-        log->debug("Making tensor of shape: {} {}", nwires, m_expected_nticks);
-        torch::Tensor plane_tensor = torch::zeros({nwires, m_expected_nticks});
-        log->debug("Made");
+        log->debug("Making tensor of shape: {} {}", nchannels, m_expected_nticks);
+        torch::Tensor plane_tensor = torch::zeros({nchannels, m_expected_nticks});
         tensors.push_back(plane_tensor);
         accessors.push_back(tensors.back().accessor<float,2>());
     }
@@ -155,35 +141,40 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     //Now loop over the traces from the input frame, get where the output should go,
     //and put into the temp vector
     for (size_t i = 0; i < ntraces; ++i) {
-        auto chan = (*in->traces())[i]->channel();
+        auto trace = (*in->traces())[i];
+        auto chan = trace->channel();
 
         //Will throw if not found
         auto output_group = m_channel_to_output_group.at(chan);
         auto output_index = m_channel_map.at(chan);
 
+        const auto & charge_seq = trace->charge();
         //Number of ticks.
         //TODO Maybe check against expectations from config and throw if different
-        auto nticks = (*in->traces())[i]->charge().size();
-        for (size_t j = 0; j < nticks; ++j) {
-            accessors[output_group][output_index][j]
-                = (*in->traces())[i]->charge()[j];
+        //or consider allowing this 
+        // const int ntbins = std::min((int) charge_seq.size(), m_nticks);
+        auto ntbins = charge_seq.size();
+        int tbin = trace->tbin();
+
+        for (size_t j = 0; j < ntbins; ++j) {
+            accessors[output_group][output_index][tbin + j] = charge_seq[j];
         }
     }
 
     //Build up Tensors according to the output groups
-    for (const auto & [output_index, nwires] : m_output_nwires) {
+    for (const auto & [output_index, nchannels] : m_output_nchannels) {
         
         // TODO: set md
         Configuration set_md;
 
         //Clone the tensor to take ownership of the memory and put into 
         //output 
-        ITorchTensor::vector* itv = new ITorchTensor::vector;
-        itv->push_back(SimpleTorchTensor::pointer(
-            new SimpleTorchTensor(tensors[output_index].clone())
-        ));
+        std::vector<ITorchTensor::pointer> itv{
+            std::make_shared<SimpleTorchTensor>(tensors[output_index].clone())
+        };
         outv[output_index] = std::make_shared<SimpleTorchTensorSet>(
-            in->ident(), set_md, ITorchTensor::shared_vector(itv)
+            in->ident(), set_md,
+            std::make_shared<std::vector<ITorchTensor::pointer>>(itv)
         );
     }
 

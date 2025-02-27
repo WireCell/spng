@@ -35,7 +35,7 @@ namespace WireCell {
             //Wire Planes to pack together into an output TorchTensorSet
             std::map<const WirePlaneId, int> m_output_groups;
             //How many wires in the TorchTensor in the ith output
-            std::map<int, int> m_output_nwires;
+            std::map<int, int> m_output_nchannels;
 
             //Channel Map
             std::unordered_map<int, int> m_channel_map;
