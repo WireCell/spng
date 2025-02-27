@@ -138,14 +138,19 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         }
     }
 
-
-    //Build up vectors to store input trace values
-    std::map<int, std::vector<float>> temp_vectors;
+    std::vector<at::TensorAccessor<float,2>> accessors;
+    std::vector<torch::Tensor> tensors;
+    //Build up tenors + accessors to store input trace values
     for (const auto & [out_group, nwires] : m_output_nwires) {
-        temp_vectors[out_group]= std::vector<float>(
-            nwires*m_expected_nticks, 0.);        
+
+        log->debug("Making tensor of shape: {} {}", nwires, m_expected_nticks);
+        torch::Tensor plane_tensor = torch::zeros({nwires, m_expected_nticks});
+        log->debug("Made");
+        tensors.push_back(plane_tensor);
+        accessors.push_back(tensors.back().accessor<float,2>());
     }
 
+    
 
     //Now loop over the traces from the input frame, get where the output should go,
     //and put into the temp vector
@@ -160,7 +165,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         //TODO Maybe check against expectations from config and throw if different
         auto nticks = (*in->traces())[i]->charge().size();
         for (size_t j = 0; j < nticks; ++j) {
-            temp_vectors[output_group][output_index*nticks + j]
+            accessors[output_group][output_index][j]
                 = (*in->traces())[i]->charge()[j];
         }
     }
@@ -168,10 +173,6 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     //Build up Tensors according to the output groups
     for (const auto & [output_index, nwires] : m_output_nwires) {
         
-        //Build tensor from the vectors we filled above
-        torch::Tensor plane_tensor = torch::from_blob(
-            &(temp_vectors[output_index][0]), {nwires, m_expected_nticks});
-
         // TODO: set md
         Configuration set_md;
 
@@ -179,7 +180,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         //output 
         ITorchTensor::vector* itv = new ITorchTensor::vector;
         itv->push_back(SimpleTorchTensor::pointer(
-            new SimpleTorchTensor(plane_tensor.clone())
+            new SimpleTorchTensor(tensors[output_index].clone())
         ));
         outv[output_index] = std::make_shared<SimpleTorchTensorSet>(
             in->ident(), set_md, ITorchTensor::shared_vector(itv)
