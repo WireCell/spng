@@ -9,14 +9,19 @@ namespace WireCell::SPNG {
       public:
         explicit SimpleTorchTensorSet(int ident)
             : m_ident(ident)
-        {
-        }
+        {}
+
         SimpleTorchTensorSet(int ident, Configuration md, ITorchTensor::shared_vector tv)
             : m_ident(ident)
             , m_md(md)
             , m_tv(tv)
-        {
-        }
+        {}
+
+        SimpleTorchTensorSet(ITorchTensorSet & input) 
+            : m_ident(input.ident()),
+              m_md(input.metadata()),
+              m_tv(input.tensors())
+        {}
         virtual ~SimpleTorchTensorSet() {}
 
         /// Return some identifier number that is unique to this set.
