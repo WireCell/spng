@@ -152,12 +152,12 @@ local torch_fields = [[{
     name: "torch_field%d_plane%d" % [anode.data.ident, iplane],
     data: {
       field_response: wc.tn(tools.fields[anode.data.ident]),#"FieldResponse:field%d"% anode.data.ident,
-      plane: iplane
+      plane: iplane,
+      do_average: true,
     }
   } for iplane in std.range(0,2)] for anode in tools.anodes];
 
 
-// std.trace('fields', torch_fields)
 local torch_decons = [
   ([g.pnode({
   type: 'SPNGDecon',

@@ -32,6 +32,8 @@
              torch::Tensor m_fr;
              std::string m_field_response{"FieldResponse"};
              int m_plane_id = 0;
+             bool m_do_fft = false;
+             bool m_do_average = false;
          };
  
      }  // namespace spng

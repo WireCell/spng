@@ -16,17 +16,29 @@ WireCell::Configuration SPNG::TorchFieldResponse::default_configuration() const
     Configuration cfg;
     cfg["field_response"] = m_field_response;
     cfg["fr_plane_id"] = m_plane_id;
+    cfg["do_fft"] = m_do_fft;
+    cfg["do_average"] = m_do_average;
     return cfg;
 }
 
 void SPNG::TorchFieldResponse::configure(const WireCell::Configuration& cfg)
 {
     m_field_response = get(cfg, "field_response", m_field_response);
-    auto base_response = Factory::find_tn<IFieldResponse>(m_field_response);
+    m_plane_id = get(cfg, "fr_plane_id", m_plane_id);
+    m_do_fft = get(cfg, "do_fft", m_do_fft);
+    m_do_average = get(cfg, "do_average", m_do_average);
+
+
+    auto ifr = Factory::find_tn<IFieldResponse>(m_field_response);
+    auto the_response = (
+        m_do_average ?
+        Response::wire_region_average(ifr->field_response()) :
+        ifr->field_response()
+    );
 
     // bool found_plane = false;
 
-    for (auto & plane : base_response->field_response().planes) {
+    for (auto & plane : the_response.planes) {
         if (plane.planeid != m_plane_id) continue;
         
         // found_plane = true;
@@ -44,8 +56,7 @@ void SPNG::TorchFieldResponse::configure(const WireCell::Configuration& cfg)
                 accessor[irow][icol] = path.current[icol];
             }
         }
-        // if (m_do_average) {
-        // }
+
         // if (m_do_fft) {
         // }
     }
