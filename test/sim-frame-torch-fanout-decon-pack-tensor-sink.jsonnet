@@ -154,6 +154,7 @@ local torch_fields = [[{
       field_response: wc.tn(tools.fields[anode.data.ident]),#"FieldResponse:field%d"% anode.data.ident,
       plane: iplane,
       do_average: true,
+      do_fft: true,
     }
   } for iplane in std.range(0,2)] for anode in tools.anodes];
 

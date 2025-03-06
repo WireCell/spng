@@ -2,6 +2,8 @@
 #include "WireCellUtil/Exceptions.h"
 #include "WireCellIface/IFieldResponse.h"
 #include "WireCellUtil/NamedFactory.h"
+#include "WireCellUtil/Exceptions.h"
+// #include <torch/torch.h>
 
 WIRECELL_FACTORY(TorchFieldResponse, WireCell::SPNG::TorchFieldResponse, WireCell::ITorchFieldResponse, WireCell::IConfigurable)
 
@@ -36,16 +38,26 @@ void SPNG::TorchFieldResponse::configure(const WireCell::Configuration& cfg)
         ifr->field_response()
     );
 
-    // bool found_plane = false;
-
+    bool found_plane = false;
     for (auto & plane : the_response.planes) {
         if (plane.planeid != m_plane_id) continue;
         
-        // found_plane = true;
+        found_plane = true;
         
         int nrows = plane.paths.size();
+        if (nrows == 0) {
+            THROW(ValueError() <<
+                errmsg{String::format("TorchFieldResponse::%s: ", m_field_response)} <<
+                errmsg{"Got 0 nrows (electron paths)"});
+        }
+
         int ncols = plane.paths[0].current.size();
-        // m_frs.push_back(torch::zeros({nrows, ncols}));
+        if (ncols == 0) {
+            THROW(ValueError() <<
+                errmsg{String::format("TorchFieldResponse::%s: ", m_field_response)} <<
+                errmsg{"Got 0 ncols"});
+        }
+
         m_fr = torch::zeros({nrows, ncols});
         log->debug("Got {} {}", nrows, ncols);
         auto accessor = m_fr.accessor<float,2>();
@@ -57,15 +69,18 @@ void SPNG::TorchFieldResponse::configure(const WireCell::Configuration& cfg)
             }
         }
 
-        // if (m_do_fft) {
-        // }
+        if (m_do_fft) {
+            log->debug("Performing FFT");
+            m_fr = torch::fft::fft(m_fr);
+        }
+        break;
+    }
+    if (!found_plane) {
+        THROW(ValueError() <<
+            errmsg{String::format("TorchFieldResponse::%s: ", m_field_response)} <<
+            errmsg{String::format("Could not find plane %d", m_plane_id)});
     }
 
-    // log->debug(m_fr);
-
-    // if (!found_plane) {
-    //     //Throw if not found
-    // }
 }
 
 torch::Tensor SPNG::TorchFieldResponse::field_response() const { return m_fr; }

@@ -21,7 +21,6 @@ WireCell::SPNG::Decon::~Decon() {};
 void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
     m_field_response = get(config, "field_response", m_field_response);
     auto base_response = Factory::find_tn<ITorchFieldResponse>(m_field_response);
-    std::cout << base_response << std::endl;
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {
