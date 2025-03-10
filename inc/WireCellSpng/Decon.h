@@ -24,6 +24,7 @@ namespace SPNG {
         };
     private:
         std::string m_field_response{"FieldResponse"};
+        std::string m_coldelec_response{"ColdElecResponse"};
     };
 }
 }

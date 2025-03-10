@@ -158,22 +158,35 @@ local torch_fields = [[{
     }
   } for iplane in std.range(0,2)] for anode in tools.anodes];
 
+local torch_coldelec = {
+  type: "TorchColdElecResponse",
+  name: 'torch_coldelec_response',
+  data: {
+    nticks: 10,
+    tick_period: 500,
+    do_fft: true,
+    gain: 1.2496976598600002e-12,
+    shaping: 2200,
+  }
+};
 
 local torch_decons = [
   ([g.pnode({
   type: 'SPNGDecon',
   name: 'spng_decon_apa%d_plane%d' % [anode.data.ident, iplane],
   data: {
-    field_response: wc.tn(torch_fields[anode.data.ident][iplane])
+    field_response: wc.tn(torch_fields[anode.data.ident][iplane]),
+    coldelec_response: wc.tn(torch_coldelec),
   },
-}, nin=1, nout=1, uses=[torch_fields[anode.data.ident][iplane]]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
+}, nin=1, nout=1, uses=[torch_fields[anode.data.ident][iplane], torch_coldelec]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
   g.pnode({
   type: 'SPNGDecon',
   name: 'spng_decon_apa%d_plane%d_opp' % [anode.data.ident, 2],
   data: {
-    field_response: wc.tn(torch_fields[anode.data.ident][2])
+    field_response: wc.tn(torch_fields[anode.data.ident][2]),
+    coldelec_response: wc.tn(torch_coldelec),
   },
-  }, nin=1, nout=1, uses=[torch_fields[anode.data.ident][2]])
+  }, nin=1, nout=1, uses=[torch_fields[anode.data.ident][2], torch_coldelec])
 ])
  for anode in tools.anodes];
 

@@ -3,6 +3,7 @@
 #include "WireCellUtil/Exceptions.h"
 #include "WireCellSpng/SimpleTorchTensorSet.h"
 #include "WireCellSpng/ITorchFieldResponse.h"
+#include "WireCellSpng/ITorchColdElecResponse.h"
 
 WIRECELL_FACTORY(SPNGDecon, WireCell::SPNG::Decon,
                  WireCell::INamed,
@@ -20,7 +21,10 @@ WireCell::SPNG::Decon::~Decon() {};
 
 void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
     m_field_response = get(config, "field_response", m_field_response);
-    auto base_response = Factory::find_tn<ITorchFieldResponse>(m_field_response);
+    auto base_field_response = Factory::find_tn<ITorchFieldResponse>(m_field_response);
+
+    m_coldelec_response = get(config, "coldelec_response", m_coldelec_response);
+    auto base_coldelec_response = Factory::find_tn<ITorchColdElecResponse>(m_coldelec_response);
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {

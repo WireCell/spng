@@ -33,6 +33,9 @@
                 bool m_do_fft = false;
                 float m_extra_scale = 1.;
                 float m_tick_period = 0.;
+                double m_gain = 0.;
+                double m_shaping = 0.;
+
                 int m_nticks = 0;
          };
  
