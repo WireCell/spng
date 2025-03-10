@@ -13,8 +13,7 @@
         public:
          virtual ~ITorchFieldResponse();
  
-         /// Return the field response data
-        //  virtual const Response::Schema::FieldResponse& field_response() const = 0;
+        /// Return the field response data
         virtual torch::Tensor field_response() const = 0;
      };
  

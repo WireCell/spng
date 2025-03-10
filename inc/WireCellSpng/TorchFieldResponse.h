@@ -28,7 +28,6 @@
              virtual WireCell::Configuration default_configuration() const;
  
             private:
-             WireCell::Configuration m_base_fr;
              torch::Tensor m_fr;
              std::string m_field_response{"FieldResponse"};
              int m_plane_id = 0;
