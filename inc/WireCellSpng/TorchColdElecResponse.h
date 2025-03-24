@@ -38,7 +38,7 @@
                 double m_gain = 0.;
                 double m_shaping = 0.;
 
-                int64_t m_nticks = 0;
+                int m_nticks = 0;
          };
  
      }  // namespace spng
