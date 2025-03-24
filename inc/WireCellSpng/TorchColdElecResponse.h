@@ -4,15 +4,15 @@
  #ifndef WIRECELLSPNG_TORCHCOLDELECRESPONSE
  #define WIRECELLSPNG_TORCHCOLDELECRESPONSE
  #include "WireCellAux/Logger.h"
- #include "WireCellSpng/ITorchColdElecResponse.h"
+ #include "WireCellSpng/ITorchSpectrum.h"
  #include "WireCellIface/IConfigurable.h"
  #include "WireCellUtil/Units.h"
  
  namespace WireCell {
      namespace SPNG {
          class TorchColdElecResponse : public Aux::Logger, 
-                                    public ITorchColdElecResponse,
-                                    public IConfigurable {
+                                       public ITorchSpectrum,
+                                       public IConfigurable {
             public:
                 // Create directly with the JSON data file or delay that
                 // for configuration.
@@ -20,8 +20,10 @@
 
                 virtual ~TorchColdElecResponse();
 
-                // ITorchColdElecResponse
-                virtual torch::Tensor coldelec_response() const;
+                // ITorchSpectrum
+                virtual torch::Tensor spectrum() const;
+
+                // virtual std::vector<int64_t> shape() constl
 
                 // IConfigurable
                 virtual void configure(const WireCell::Configuration& config);
@@ -36,7 +38,7 @@
                 double m_gain = 0.;
                 double m_shaping = 0.;
 
-                int m_nticks = 0;
+                int64_t m_nticks = 0;
          };
  
      }  // namespace spng

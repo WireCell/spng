@@ -3,9 +3,11 @@
 #include "WireCellUtil/NamedFactory.h"
 #include "WireCellUtil/Exceptions.h"
 #include "WireCellUtil/Response.h"
+
+#include "WireCellIface/IWaveform.h"
 // #include <torch/torch.h>
 
-WIRECELL_FACTORY(TorchColdElecResponse, WireCell::SPNG::TorchColdElecResponse, WireCell::ITorchColdElecResponse, WireCell::IConfigurable)
+WIRECELL_FACTORY(TorchColdElecResponse, WireCell::SPNG::TorchColdElecResponse, WireCell::ITorchSpectrum, WireCell::IConfigurable)
 
 using namespace WireCell;
 
@@ -23,7 +25,6 @@ WireCell::Configuration SPNG::TorchColdElecResponse::default_configuration() con
     cfg["tick_period"] = m_tick_period;
     cfg["shaping"] = m_shaping;
     cfg["gain"] = m_gain;
-
     return cfg;
 }
 
@@ -36,15 +37,17 @@ void SPNG::TorchColdElecResponse::configure(const WireCell::Configuration& cfg)
     m_tick_period = get(cfg, "tick_period", m_tick_period);
     m_gain = get(cfg, "gain", m_gain);
     m_shaping = get(cfg, "shaping", m_shaping);
+    m_shape = {m_nticks};
     //TODO -- replace with 
-    // std::cout << "Trying to get iwaveform " << m_coldelec_response << std::endl;
     // auto ier = Factory::find_tn<IWaveform>(m_coldelec_response);
 
+    
     auto elec_resp_generator
         = std::make_unique<Response::ColdElec>(m_gain, m_shaping);
 
     //Get the waveform from the electronics response
     WireCell::Binning tbins(m_nticks, 0, m_nticks * m_tick_period);
+    // std::cout << ier->waveform_samples(tbins).size() << std::endl;
     auto ewave = elec_resp_generator->generate(tbins);
 
     m_elec_response = torch::zeros({m_nticks});
@@ -64,4 +67,4 @@ void SPNG::TorchColdElecResponse::configure(const WireCell::Configuration& cfg)
     }
 }
 
-torch::Tensor SPNG::TorchColdElecResponse::coldelec_response() const { return m_elec_response; }
+torch::Tensor SPNG::TorchColdElecResponse::spectrum() const { return m_elec_response; }

@@ -5,7 +5,7 @@
 #include "WireCellUtil/Exceptions.h"
 // #include <torch/torch.h>
 
-WIRECELL_FACTORY(TorchFieldResponse, WireCell::SPNG::TorchFieldResponse, WireCell::ITorchFieldResponse, WireCell::IConfigurable)
+WIRECELL_FACTORY(TorchFieldResponse, WireCell::SPNG::TorchFieldResponse, WireCell::ITorchSpectrum, WireCell::IConfigurable)
 
 using namespace WireCell;
 
@@ -44,19 +44,21 @@ void SPNG::TorchFieldResponse::configure(const WireCell::Configuration& cfg)
         
         found_plane = true;
         
-        int nrows = plane.paths.size();
+        int64_t nrows = plane.paths.size();
         if (nrows == 0) {
             THROW(ValueError() <<
                 errmsg{String::format("TorchFieldResponse::%s: ", m_field_response)} <<
                 errmsg{"Got 0 nrows (electron paths)"});
         }
 
-        int ncols = plane.paths[0].current.size();
+        int64_t ncols = plane.paths[0].current.size();
         if (ncols == 0) {
             THROW(ValueError() <<
                 errmsg{String::format("TorchFieldResponse::%s: ", m_field_response)} <<
                 errmsg{"Got 0 ncols"});
         }
+
+        m_shape = {nrows, ncols};
 
         m_fr = torch::zeros({nrows, ncols});
         log->debug("Got {} {}", nrows, ncols);
@@ -83,4 +85,4 @@ void SPNG::TorchFieldResponse::configure(const WireCell::Configuration& cfg)
 
 }
 
-torch::Tensor SPNG::TorchFieldResponse::field_response() const { return m_fr; }
+torch::Tensor SPNG::TorchFieldResponse::spectrum() const { return m_fr; }

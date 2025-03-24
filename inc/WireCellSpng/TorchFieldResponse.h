@@ -4,14 +4,14 @@
  #ifndef WIRECELLSPNG_TORCHFIELDRESPONSE
  #define WIRECELLSPNG_TORCHFIELDRESPONSE
  #include "WireCellAux/Logger.h"
- #include "WireCellSpng/ITorchFieldResponse.h"
+ #include "WireCellSpng/ITorchSpectrum.h"
  #include "WireCellIface/IConfigurable.h"
  #include "WireCellUtil/Units.h"
  
  namespace WireCell {
      namespace SPNG {
          class TorchFieldResponse : public Aux::Logger, 
-                                    public ITorchFieldResponse,
+                                    public ITorchSpectrum,
                                     public IConfigurable {
             public:
              // Create directly with the JSON data file or delay that
@@ -20,9 +20,11 @@
  
              virtual ~TorchFieldResponse();
  
-             // ITorchFieldResponse
-             virtual torch::Tensor field_response() const;
+             // ITorchSpectrum
+             virtual torch::Tensor spectrum() const;
  
+            //  virtual std::vector<int64_t> shape() const;
+
              // IConfigurable
              virtual void configure(const WireCell::Configuration& config);
              virtual WireCell::Configuration default_configuration() const;

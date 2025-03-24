@@ -150,6 +150,7 @@ local torch_to_tensors = [g.pnode({
 local torch_fields = [[{
     type: "TorchFieldResponse",
     name: "torch_field%d_plane%d" % [anode.data.ident, iplane],
+    uses: [tools.fields[anode.data.ident]],
     data: {
       field_response: wc.tn(tools.fields[anode.data.ident]),#"FieldResponse:field%d"% anode.data.ident,
       plane: iplane,
@@ -161,6 +162,7 @@ local torch_fields = [[{
 local torch_coldelec = {
   type: "TorchColdElecResponse",
   name: 'torch_coldelec_response',
+  uses: [tools.elec_resp],
   data: {
     nticks: 10,
     tick_period: 500,
