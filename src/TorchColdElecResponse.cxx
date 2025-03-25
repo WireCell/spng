@@ -39,16 +39,16 @@ void SPNG::TorchColdElecResponse::configure(const WireCell::Configuration& cfg)
     m_shaping = get(cfg, "shaping", m_shaping);
     m_shape = {m_nticks};
     //TODO -- replace with 
-    // auto ier = Factory::find_tn<IWaveform>(m_coldelec_response);
+    auto ier = Factory::find_tn<IWaveform>(m_coldelec_response);
 
     
-    auto elec_resp_generator
-        = std::make_unique<Response::ColdElec>(m_gain, m_shaping);
+    // auto elec_resp_generator
+    //     = std::make_unique<Response::ColdElec>(m_gain, m_shaping);
 
     //Get the waveform from the electronics response
     WireCell::Binning tbins(m_nticks, 0, m_nticks * m_tick_period);
     // std::cout << ier->waveform_samples(tbins).size() << std::endl;
-    auto ewave = elec_resp_generator->generate(tbins);
+    auto ewave = ier->waveform_samples(tbins);//elec_resp_generator->generate(tbins);
 
     m_elec_response = torch::zeros({m_nticks});
 

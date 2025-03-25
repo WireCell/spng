@@ -26,6 +26,8 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
 
     m_coldelec_response = get(config, "coldelec_response", m_coldelec_response);
     auto base_coldelec_response = Factory::find_tn<ITorchSpectrum>(m_coldelec_response);
+
+
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {
