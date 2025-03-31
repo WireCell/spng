@@ -1,34 +1,30 @@
 /** FILL ME OUT
- */
+*/
 
- #ifndef WIRECELLSPNG_ITORCHSPECTRUM
- #define WIRECELLSPNG_ITORCHSPECTRUM
- 
- #include "WireCellUtil/IComponent.h"
- #include <torch/torch.h>
+#ifndef WIRECELLSPNG_ITORCHSPECTRUM
+#define WIRECELLSPNG_ITORCHSPECTRUM
 
- namespace WireCell {
- 
-    class ITorchSpectrum : public IComponent<ITorchSpectrum> {
-    public:
-        virtual ~ITorchSpectrum();
- 
-        /// Return the coldelec response data
-        virtual torch::Tensor spectrum() const = 0;
+#include "WireCellUtil/IComponent.h"
+#include <torch/torch.h>
+// #include "WireCellSpng/hash_util.h"
+#include <boost/compute/detail/lru_cache.hpp>
 
-        /// Get the base shape of the response
-        virtual const std::vector<int64_t> & shape() const {return m_shape;};
-    protected:
-        std::vector<int64_t> m_shape;
+namespace WireCell {
 
-        //Idea make a cache by hand with this
-        // https://www.reddit.com/r/cpp_questions/comments/16d6seh/hash_value_of_stdvector_gets_computed_but_unable/
-        // std::map<vector<int64_t>, torch::Tensor, boost::hash<std::vector<int>>
+class ITorchSpectrum : public IComponent<ITorchSpectrum> {
+public:
+    ITorchSpectrum() {};
+    virtual ~ITorchSpectrum();
 
-        // unless this works out of the box
-        // https://www.boost.org/doc/libs/1_67_0/boost/compute/detail/lru_cache.hpp
-    };
- 
- }  // namespace WireCell
- 
- #endif
+    /// Return the coldelec response data
+    virtual torch::Tensor spectrum() const = 0;
+
+    /// Get the base shape of the response
+    virtual const std::vector<int64_t> & shape() const {return m_shape;};
+protected:
+    std::vector<int64_t> m_shape;
+};
+
+}  // namespace WireCell
+
+#endif

@@ -53,7 +53,6 @@ void SPNG::TorchColdElecResponse::configure(const WireCell::Configuration& cfg)
     m_elec_response = torch::zeros({m_nticks});
 
     auto accessor = m_elec_response.accessor<float,1>();
-
     for (int i = 0; i < m_nticks; ++i) {
         accessor[i] = ewave[i];
         // accessor[i] = 1.;
