@@ -21,13 +21,15 @@ WireCell::SPNG::Decon::~Decon() {};
 
 
 void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
-    m_field_response = get(config, "field_response", m_field_response);
-    auto base_field_response = Factory::find_tn<ITorchSpectrum>(m_field_response);
+    // m_field_response = get(config, "field_response", m_field_response);
+    // auto base_field_response = Factory::find_tn<ITorchSpectrum>(m_field_response);
 
-    m_coldelec_response = get(config, "coldelec_response", m_coldelec_response);
-    auto base_coldelec_response = Factory::find_tn<ITorchSpectrum>(m_coldelec_response);
+    // m_coldelec_response = get(config, "coldelec_response", m_coldelec_response);
+    // auto base_coldelec_response = Factory::find_tn<ITorchSpectrum>(m_coldelec_response);
 
-
+    m_frer_spectrum = get(config, "frer_spectrum", m_frer_spectrum);
+    auto base_frer_spectrum = Factory::find_tn<ITorchSpectrum>(m_frer_spectrum);
+    // std::cout << base_frer_spectrum->spectrum() << std::endl;
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {

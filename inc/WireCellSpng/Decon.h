@@ -5,6 +5,7 @@
 
 #include "WireCellSpng/ITorchTensorSetFilter.h"
 #include "WireCellIface/IConfigurable.h"
+#include "WireCellSpng/ITorchSpectrum.h"
 
 
 
@@ -23,8 +24,11 @@ namespace SPNG {
             return cfg;
         };
     private:
-        std::string m_field_response{"FieldResponse"};
-        std::string m_coldelec_response{"ColdElecResponse"};
+        // std::string m_field_response{"FieldResponse"};
+        // std::string m_coldelec_response{"ColdElecResponse"};
+        std::string m_frer_spectrum{"FRERSpectrum"};
+
+        std::shared_ptr<ITorchSpectrum> base_frer_spectrum;
     };
 }
 }

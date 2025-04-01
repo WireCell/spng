@@ -172,23 +172,44 @@ local torch_coldelec = {
   }
 };
 
+local nchans = [480, 800, 800];
+
+// One FRER per field file.
+local torch_frers = [[{
+    type: "TorchFRERSpectrum",
+    name: "torch_frer%d_plane%d" % [anode.data.ident, iplane],
+    uses: [tools.fields[anode.data.ident], tools.elec_resp],
+    data: {
+      field_response: wc.tn(tools.fields[anode.data.ident]),#"FieldResponse:field%d"% anode.data.ident,
+      fr_plane_id: iplane,
+      ADC_mV: 11702142857.142859,
+      inter_gain: 1.0,
+      default_nchans : nchans[iplane],
+      default_nticks: 6000,
+      default_period: 512*wc.ns,
+      extra_scale: 1.0,
+    }
+  } for iplane in std.range(0,2)] for anode in tools.anodes];
+
 local torch_decons = [
   ([g.pnode({
   type: 'SPNGDecon',
   name: 'spng_decon_apa%d_plane%d' % [anode.data.ident, iplane],
   data: {
-    field_response: wc.tn(torch_fields[anode.data.ident][iplane]),
-    coldelec_response: wc.tn(torch_coldelec),
+    // field_response: wc.tn(torch_fields[anode.data.ident][iplane]),
+    // coldelec_response: wc.tn(torch_coldelec),
+    frer_spectrum: wc.tn(torch_frers[anode.data.ident][iplane])
   },
-}, nin=1, nout=1, uses=[torch_fields[anode.data.ident][iplane], torch_coldelec]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
+}, nin=1, nout=1, uses=[torch_frers[anode.data.ident][iplane]]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
   g.pnode({
   type: 'SPNGDecon',
   name: 'spng_decon_apa%d_plane%d_opp' % [anode.data.ident, 2],
   data: {
-    field_response: wc.tn(torch_fields[anode.data.ident][2]),
-    coldelec_response: wc.tn(torch_coldelec),
+    // field_response: wc.tn(torch_fields[anode.data.ident][2]),
+    // coldelec_response: wc.tn(torch_coldelec),
+    frer_spectrum: wc.tn(torch_frers[anode.data.ident][2])
   },
-  }, nin=1, nout=1, uses=[torch_fields[anode.data.ident][2], torch_coldelec])
+  }, nin=1, nout=1, uses=[torch_frers[anode.data.ident][2]])
 ])
  for anode in tools.anodes];
 

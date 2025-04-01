@@ -60,17 +60,6 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
 
 
 
-    m_elec_response = Factory::find_tn<IWaveform>(m_elec_response_name);
-    torch::Tensor elec_response_tensor = torch::zeros(m_fravg_nticks);
-    WireCell::Binning tbins(m_fravg_nticks, 0, m_fravg_nticks*m_fravg_period);
-    auto ewave = m_elec_response->waveform_samples(tbins);
-    auto accessor = elec_response_tensor.accessor<float,1>();
-    for (int i = 0; i < m_fravg_nticks; ++i) {
-        accessor[i] = ewave[i];
-    }
-    elec_response_tensor *= m_inter_gain * m_ADC_mV * (-1);
-    elec_response_tensor = torch::fft::fft(elec_response_tensor);
-
     bool found_plane = false;
     for (auto & plane : m_field_response_avg.planes) {
         if (plane.planeid != m_plane_id) continue;
@@ -106,8 +95,8 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
                 accessor[irow][icol] = path.current[icol];
             }
         }
-
-        m_total_response = torch::fft::fft(m_total_response);
+        log->debug("Doing FFT field resp");
+        m_total_response = torch::fft::rfft(m_total_response);
     }
     if (!found_plane) {
         THROW(ValueError() <<
@@ -115,7 +104,27 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
             errmsg{String::format("Could not find plane %d", m_plane_id)});
     }
 
+    m_elec_response = Factory::find_tn<IWaveform>(m_elec_response_name);
+    torch::Tensor elec_response_tensor = torch::zeros(m_fravg_nticks);
+    WireCell::Binning tbins(m_fravg_nticks, 0, m_fravg_nticks*m_fravg_period);
+    auto ewave = m_elec_response->waveform_samples(tbins);
+    auto accessor = elec_response_tensor.accessor<float,1>();
+    for (int i = 0; i < m_fravg_nticks; ++i) {
+        accessor[i] = ewave[i];
+    }
+    elec_response_tensor *= m_inter_gain * m_ADC_mV * (-1);
+    // std::cout << elec_response_tensor << std::endl;
+
+    log->debug("Doing FFT elec resp");
+    elec_response_tensor = torch::fft::rfft(elec_response_tensor);
+
+    log->debug("Multiplying FFT'd elec and field resp");
     m_total_response *= elec_response_tensor * m_fravg_period;
+    
+    log->debug("Multiplying FFT'd elec and field resp");
+    m_total_response = torch::fft::irfft(m_total_response);
+    log->debug("Done");
+
     auto total_response_accessor = m_total_response.accessor<float,2>();
     //Redigitize according to default nchans, nticks.
     m_applied_response = torch::zeros({m_default_nchans, m_default_nticks});
