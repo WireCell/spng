@@ -108,7 +108,7 @@ local parallel_pipes = [
 ];
 local outtags = ['raw%d' % n for n in std.range(0, std.length(tools.anodes) - 1)];
 
-local parallel_graph = f.fanpipe('DepoSetFanout', parallel_pipes, 'FrameFanin', 'sn_mag_nf', outtags);
+// local parallel_graph = f.fanpipe('DepoSetFanout', parallel_pipes, 'FrameFanin', 'sn_mag_nf', outtags);
 local depo_sn_nf_fanout = g.fan.fanout('DepoSetFanout', parallel_pipes, 'sn_mag_nf');
 
 local tf_maker = import 'torch.jsonnet';
@@ -128,16 +128,6 @@ local tensor_sinks = [
   //  }, nin=1, nout=0) for n in std.range(0, std.length(tools.anodes) - 1)
    }, nin=1, nout=0) for n in std.range(0, 15)
 ];
-
-
-local torch_packers = [g.pnode({
-  type: 'TorchPacker',
-  name: 'torchpacker%d' % n,
-  data: {
-    'multiplicity': 3
-  },
-}, nin=3, nout=1) for n in std.range(0, std.length(tools.anodes)-1)];
-
 
 local torch_to_tensors = [g.pnode({
   type: 'TorchToTensor',
@@ -172,7 +162,7 @@ local torch_coldelec = {
   }
 };
 
-local nchans = [480, 800, 800];
+local nchans = [800, 800, 480];
 
 // One FRER per field file.
 local torch_frers = [[{
@@ -213,11 +203,10 @@ local torch_decons = [
 ])
  for anode in tools.anodes];
 
-local tfs_to_tensors = g.intern(
-    innodes=tf_fans,
-    centernodes=std.flattenArrays(torch_decons),
-    outnodes=torch_to_tensors,
-    edges=[
+local tfs_to_decons = g.intern(
+  innodes=tf_fans,
+  outnodes=std.flattenArrays(torch_decons),
+  edges = [
       g.edge(tf_fans[0], torch_decons[0][0], 0),
       g.edge(tf_fans[0], torch_decons[0][1], 1),
       g.edge(tf_fans[0], torch_decons[0][2], 2),
@@ -234,26 +223,74 @@ local tfs_to_tensors = g.intern(
       g.edge(tf_fans[3], torch_decons[3][1], 1),
       g.edge(tf_fans[3], torch_decons[3][2], 2),
       g.edge(tf_fans[3], torch_decons[3][3], 3),
-
-      g.edge(torch_decons[0][0], torch_to_tensors[0]),
-      g.edge(torch_decons[0][1], torch_to_tensors[1]),
-      g.edge(torch_decons[0][2], torch_to_tensors[2]),
-      g.edge(torch_decons[0][3], torch_to_tensors[3]),
-      g.edge(torch_decons[1][0], torch_to_tensors[4]),
-      g.edge(torch_decons[1][1], torch_to_tensors[5]),
-      g.edge(torch_decons[1][2], torch_to_tensors[6]),
-      g.edge(torch_decons[1][3], torch_to_tensors[7]),
-      g.edge(torch_decons[2][0], torch_to_tensors[8]),
-      g.edge(torch_decons[2][1], torch_to_tensors[9]),
-      g.edge(torch_decons[2][2], torch_to_tensors[10]),
-      g.edge(torch_decons[2][3], torch_to_tensors[11]),
-      g.edge(torch_decons[3][0], torch_to_tensors[12]),
-      g.edge(torch_decons[3][1], torch_to_tensors[13]),
-      g.edge(torch_decons[3][2], torch_to_tensors[14]),
-      g.edge(torch_decons[3][3], torch_to_tensors[15]),
-
-    ],
+  ],
 );
+
+local tfs_to_tensors = g.intern(
+    innodes=[tfs_to_decons],
+    outnodes=torch_to_tensors,
+    edges=[
+      g.edge(tfs_to_decons, torch_to_tensors[0], 0),
+      g.edge(tfs_to_decons, torch_to_tensors[1], 1),
+      g.edge(tfs_to_decons, torch_to_tensors[2], 2),
+      g.edge(tfs_to_decons, torch_to_tensors[3], 3),
+      g.edge(tfs_to_decons, torch_to_tensors[4], 4),
+      g.edge(tfs_to_decons, torch_to_tensors[5], 5),
+      g.edge(tfs_to_decons, torch_to_tensors[6], 6),
+      g.edge(tfs_to_decons, torch_to_tensors[7], 7),
+      g.edge(tfs_to_decons, torch_to_tensors[8], 8),
+      g.edge(tfs_to_decons, torch_to_tensors[9], 9),
+      g.edge(tfs_to_decons, torch_to_tensors[10], 10),
+      g.edge(tfs_to_decons, torch_to_tensors[11], 11),
+      g.edge(tfs_to_decons, torch_to_tensors[12], 12),
+      g.edge(tfs_to_decons, torch_to_tensors[13], 13),
+      g.edge(tfs_to_decons, torch_to_tensors[14], 14),
+      g.edge(tfs_to_decons, torch_to_tensors[15], 15),
+
+    ]
+);
+
+// local tfs_to_tensors = g.intern(
+//     innodes=tf_fans,
+//     centernodes=std.flattenArrays(torch_decons),
+//     outnodes=torch_to_tensors,
+//     edges=[
+//       g.edge(tf_fans[0], torch_decons[0][0], 0),
+//       g.edge(tf_fans[0], torch_decons[0][1], 1),
+//       g.edge(tf_fans[0], torch_decons[0][2], 2),
+//       g.edge(tf_fans[0], torch_decons[0][3], 3),
+//       g.edge(tf_fans[1], torch_decons[1][0], 0),
+//       g.edge(tf_fans[1], torch_decons[1][1], 1),
+//       g.edge(tf_fans[1], torch_decons[1][2], 2),
+//       g.edge(tf_fans[1], torch_decons[1][3], 3),
+//       g.edge(tf_fans[2], torch_decons[2][0], 0),
+//       g.edge(tf_fans[2], torch_decons[2][1], 1),
+//       g.edge(tf_fans[2], torch_decons[2][2], 2),
+//       g.edge(tf_fans[2], torch_decons[2][3], 3),
+//       g.edge(tf_fans[3], torch_decons[3][0], 0),
+//       g.edge(tf_fans[3], torch_decons[3][1], 1),
+//       g.edge(tf_fans[3], torch_decons[3][2], 2),
+//       g.edge(tf_fans[3], torch_decons[3][3], 3),
+
+//       g.edge(torch_decons[0][0], torch_to_tensors[0]),
+//       g.edge(torch_decons[0][1], torch_to_tensors[1]),
+//       g.edge(torch_decons[0][2], torch_to_tensors[2]),
+//       g.edge(torch_decons[0][3], torch_to_tensors[3]),
+//       g.edge(torch_decons[1][0], torch_to_tensors[4]),
+//       g.edge(torch_decons[1][1], torch_to_tensors[5]),
+//       g.edge(torch_decons[1][2], torch_to_tensors[6]),
+//       g.edge(torch_decons[1][3], torch_to_tensors[7]),
+//       g.edge(torch_decons[2][0], torch_to_tensors[8]),
+//       g.edge(torch_decons[2][1], torch_to_tensors[9]),
+//       g.edge(torch_decons[2][2], torch_to_tensors[10]),
+//       g.edge(torch_decons[2][3], torch_to_tensors[11]),
+//       g.edge(torch_decons[3][0], torch_to_tensors[12]),
+//       g.edge(torch_decons[3][1], torch_to_tensors[13]),
+//       g.edge(torch_decons[3][2], torch_to_tensors[14]),
+//       g.edge(torch_decons[3][3], torch_to_tensors[15]),
+
+//     ],
+// );
 
 local tfs_to_tensors_to_sinks = g.intern(
     innodes=[tfs_to_tensors],
@@ -304,10 +341,6 @@ local new_graph = g.intern(
     g.edge(depos_to_fanout, tfs_to_tensors_to_sinks, 1, 1),
     g.edge(depos_to_fanout, tfs_to_tensors_to_sinks, 2, 2),
     g.edge(depos_to_fanout, tfs_to_tensors_to_sinks, 3, 3),
-    // g.edge(depos_to_fanout, to_sinks[0], 0, 0),
-    // g.edge(depos_to_fanout, to_sinks[1], 0, 0),
-    // g.edge(depos_to_fanout, to_sinks[2], 0, 0),
-    // g.edge(depos_to_fanout, to_sinks[3], 0, 0),
   ]
 );
 
