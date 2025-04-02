@@ -96,7 +96,7 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
             }
         }
         log->debug("Doing FFT field resp");
-        m_total_response = torch::fft::rfft(m_total_response);
+        m_total_response = torch::fft::rfft(m_total_response, std::nullopt, 1);
     }
     if (!found_plane) {
         THROW(ValueError() <<
@@ -122,7 +122,7 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     m_total_response *= elec_response_tensor * m_fravg_period;
     
     log->debug("Multiplying FFT'd elec and field resp");
-    m_total_response = torch::fft::irfft(m_total_response);
+    m_total_response = torch::fft::irfft(m_total_response, std::nullopt, 1);
     log->debug("Done");
 
     auto total_response_accessor = m_total_response.accessor<float,2>();
@@ -141,12 +141,14 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
                 }
 
             if (fcount < m_fravg_nticks) {
-                applied_response_accessor[irow][i] = ((ctime - m_fravg_period*(fcount - 1)) / m_fravg_period * total_response_accessor[irow][fcount - 1] +
-                             (m_fravg_period*fcount - ctime) / m_fravg_period * total_response_accessor[irow][fcount]);  // / (-1);
+                applied_response_accessor[irow][i] = (
+                    (ctime - m_fravg_period*(fcount - 1)) / m_fravg_period * total_response_accessor[irow][fcount - 1] +
+                    (m_fravg_period*fcount - ctime) / m_fravg_period * total_response_accessor[irow][fcount]
+                );  // / (-1);
             }
-            else {
-                applied_response_accessor[irow][i] = 0;
-            }
+            // else {
+            //     applied_response_accessor[irow][i] = 0;
+            // }
         }
     }
 }
