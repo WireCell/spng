@@ -67,6 +67,8 @@ local bagger = sim.make_bagger();
 local sn_pipes = sim.splusn_pipelines;
 // local analog_pipes = sim.analog_pipelines;
 
+// tools.fields[0].data['filename'] = 'dune-garfield-1d565.json.bz2';
+
 local perfect = import 'pgrapher/experiment/pdhd/chndb-base.jsonnet';
 local chndb = [{
   type: 'OmniChannelNoiseDB',
@@ -176,10 +178,41 @@ local torch_frers = [[{
       inter_gain: 1.0,
       default_nchans : nchans[iplane],
       default_nticks: 6000,
-      default_period: 512*wc.ns,
+      default_period: 512.0,
       extra_scale: 1.0,
+      anode_num: anode.data.ident,
     }
   } for iplane in std.range(0,2)] for anode in tools.anodes];
+
+local spfilt = import 'pgrapher/experiment/pdhd/sp-filters.jsonnet';
+
+local wire_filters = [
+  spfilt.wf('Wire_ind', { sigma: 1.0 / wc.sqrtpi * 0.75 }), 
+  spfilt.wf('Wire_col', { sigma: 1.0 / wc.sqrtpi * 10.0 })
+];
+
+local torch_wire_filters = [
+  {
+    type: "Torch1DSpectrum",
+    name: "torch_1dspec_ind",
+    uses: [wire_filters[0]],
+    data: {
+      spectra: [
+        'Wire_ind',
+      ]
+    },
+  },
+  {
+    type: "Torch1DSpectrum",
+    name: "torch_1dspec_col",
+    uses: [wire_filters[1]],
+    data: {
+      spectra: [
+        'Wire_col',
+      ]
+    },
+  },
+];
 
 local torch_decons = [
   ([g.pnode({
@@ -188,18 +221,20 @@ local torch_decons = [
   data: {
     // field_response: wc.tn(torch_fields[anode.data.ident][iplane]),
     // coldelec_response: wc.tn(torch_coldelec),
-    frer_spectrum: wc.tn(torch_frers[anode.data.ident][iplane])
+    frer_spectrum: wc.tn(torch_frers[anode.data.ident][iplane]),
+    wire_filter: torch_wire_filters[0], #put in if statement
   },
-}, nin=1, nout=1, uses=[torch_frers[anode.data.ident][iplane]]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
+}, nin=1, nout=1, uses=[torch_frers[anode.data.ident][iplane], torch_wire_filters[0]]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
   g.pnode({
   type: 'SPNGDecon',
   name: 'spng_decon_apa%d_plane%d_opp' % [anode.data.ident, 2],
   data: {
     // field_response: wc.tn(torch_fields[anode.data.ident][2]),
     // coldelec_response: wc.tn(torch_coldelec),
-    frer_spectrum: wc.tn(torch_frers[anode.data.ident][2])
+    frer_spectrum: wc.tn(torch_frers[anode.data.ident][2]),
+    wire_filter: torch_wire_filters[1]
   },
-  }, nin=1, nout=1, uses=[torch_frers[anode.data.ident][2]])
+  }, nin=1, nout=1, uses=[torch_frers[anode.data.ident][2], torch_wire_filters[1]])
 ])
  for anode in tools.anodes];
 

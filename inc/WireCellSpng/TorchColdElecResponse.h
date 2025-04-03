@@ -22,6 +22,9 @@
 
                 // ITorchSpectrum
                 virtual torch::Tensor spectrum() const;
+                virtual torch::Tensor spectrum(const std::vector<int64_t> & shape) {
+                    return torch::zeros(shape);
+                };
 
                 // virtual std::vector<int64_t> shape() constl
 

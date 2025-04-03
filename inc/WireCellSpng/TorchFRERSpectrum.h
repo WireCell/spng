@@ -24,7 +24,7 @@ namespace WireCell {
 
             // ITorchSpectrum
             virtual torch::Tensor spectrum() const;
-
+            virtual torch::Tensor spectrum(const std::vector<int64_t> & shape);
         //  virtual std::vector<int64_t> shape() const;
 
             // IConfigurable
@@ -32,6 +32,8 @@ namespace WireCell {
             virtual WireCell::Configuration default_configuration() const;
 
         private:
+
+            void redigitize(const std::vector<int64_t> & input_shape);
             torch::Tensor m_total_response, m_applied_response;
             boost::compute::detail::lru_cache<std::vector<int64_t>, torch::Tensor> m_cache;
             std::string m_field_response_name{"FieldResponse"};
@@ -57,6 +59,8 @@ namespace WireCell {
             int m_default_nticks = 0;
             int m_default_nchans = 0;
             bool m_do_fft = false;
+
+            int m_anode_num = 0;
 
         };
 

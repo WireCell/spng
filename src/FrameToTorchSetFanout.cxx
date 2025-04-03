@@ -109,6 +109,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     //Exit if no traces
     const size_t ntraces = in->traces()->size();
     log->debug("Ntraces: {}", ntraces);
+    log->debug("Tick (Period): {}", in->tick());
     if (ntraces == 0) {
         log->debug("No traces, exiting");
         return true;

@@ -13,24 +13,19 @@ WIRECELL_FACTORY(SPNGDecon, WireCell::SPNG::Decon,
 
 WireCell::SPNG::Decon::Decon()
   : Aux::Logger("SPNGDecon", "spng") {
-    // get wires for each plane
 
-    // std::cout << m_anode->channels().size() << " " << nwire_u << " " << nwire_v << " " << nwire_w << std::endl;
 }
 
 WireCell::SPNG::Decon::~Decon() {};
 
 
 void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
-    // m_field_response = get(config, "field_response", m_field_response);
-    // auto base_field_response = Factory::find_tn<ITorchSpectrum>(m_field_response);
-
-    // m_coldelec_response = get(config, "coldelec_response", m_coldelec_response);
-    // auto base_coldelec_response = Factory::find_tn<ITorchSpectrum>(m_coldelec_response);
 
     m_frer_spectrum = get(config, "frer_spectrum", m_frer_spectrum);
     base_frer_spectrum = Factory::find_tn<ITorchSpectrum>(m_frer_spectrum);
-    // std::cout << base_frer_spectrum->spectrum() << std::endl;
+
+    m_wire_filter = get(config, "wire_filter", m_wire_filter);
+    base_wire_filter = Factory::find_tn<ITorchSpectrum>(m_wire_filter);
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {
@@ -84,8 +79,6 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         in->ident(), set_md,
         std::make_shared<std::vector<ITorchTensor::pointer>>(itv)
     );
-    //Placeholder
-    // out = WireCell::SPNG::SimpleTorchTensorSet::pointer(in);
 
     return true;
 }

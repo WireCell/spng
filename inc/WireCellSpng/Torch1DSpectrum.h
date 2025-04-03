@@ -23,7 +23,7 @@
  
              // ITorchSpectrum
              virtual torch::Tensor spectrum() const;
- 
+             virtual torch::Tensor spectrum(const std::vector<int64_t> & shape);
 
              // IConfigurable
              virtual void configure(const WireCell::Configuration& config);
@@ -32,7 +32,7 @@
             private:
              torch::Tensor m_total_spectrum;
              std::vector<std::shared_ptr<IFilterWaveform>> m_spectra{};
-             int m_default_nticks{6000};
+             int m_default_length = 0;
              //List holding the type & name of spectra i.e. {HfFilter, Wiener_tight_V}
             //  std::vector<std::pair<std::string, std::string>> m_spectra_names {};
              std::vector<std::string> m_spectra_tns{};
