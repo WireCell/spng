@@ -8,7 +8,7 @@ WIRECELL_FACTORY(Torch1DSpectrum, WireCell::SPNG::Torch1DSpectrum, WireCell::ITo
 
 using namespace WireCell;
 
-SPNG::Torch1DSpectrum::Torch1DSpectrum() : Aux::Logger("Torch1DSpectrum", "spng") {}
+SPNG::Torch1DSpectrum::Torch1DSpectrum() : Aux::Logger("Torch1DSpectrum", "spng"), m_cache(5) {}
 
 SPNG::Torch1DSpectrum::~Torch1DSpectrum() {}
 
@@ -24,7 +24,7 @@ void SPNG::Torch1DSpectrum::configure(const WireCell::Configuration& cfg)
 
     m_default_length = get(cfg, "default_length", m_default_length);
     m_total_spectrum = torch::ones(m_default_length);
-    auto accessor = m_total_spectrum.accessor<float,1>();
+    /*auto accessor = m_total_spectrum.accessor<float,1>();*/
 
     if (cfg.isMember("spectra")) {
         m_spectra.clear();
@@ -32,31 +32,60 @@ void SPNG::Torch1DSpectrum::configure(const WireCell::Configuration& cfg)
         for (auto tn: cfg["spectra"]) {
             m_spectra_tns.push_back(tn.asString());
             m_spectra.push_back(Factory::find_tn<IFilterWaveform>(tn.asString()));
-            log->debug("Adding {} to list of spectra", m_spectra_tns.back());
+            // m_spectrum_tensors.push_back(torch.zeros({m_default_length}));
+            // auto accessor = m_spectrum_tensors.back().accessor<float,1>();
+            // log->debug("Adding {} to list of spectra", m_spectra_tns.back());
 
-            auto vals = m_spectra.back()->filter_waveform(m_default_length);
-            for (size_t i = 0; i != vals.size(); i++) {
-                accessor[i] *= vals.at(i);
-            }
+            // auto vals = m_spectra.back()->filter_waveform(m_default_length);
+            // for (size_t i = 0; i != vals.size(); i++) {
+            //     accessor[i] = vals.at(i);
+            // }
+
+            // //FFT this spectrum
+            // m_spectrum_tensors.back() = torch::fft::rfft(m_spectrum_tensors.back());
         }
     }
 
 }
 
-torch::Tensor SPNG::Torch1DSpectrum::spectrum() const { return m_total_spectrum; }
+torch::Tensor SPNG::Torch1DSpectrum::spectrum() const {
+    return torch::zeros({m_default_length});
+}
 
 torch::Tensor SPNG::Torch1DSpectrum::spectrum(const std::vector<int64_t> & shape) {
-
     //TODO -- add in throw if not 1D shape
-    m_total_spectrum = torch::ones(shape);
-    auto accessor = m_total_spectrum.accessor<float,1>();
 
-    for (const auto & spectrum : m_spectra) {
+    //If this shape has been used recenty, return the cached value
+    if (m_cache.contains(shape)) {
+        return m_cache.get(shape).value();
+    }
+
+    //If not, we need to create a new version
+    m_cache.insert(shape, torch::ones(shape));
+
+    //Loop over the spectra
+    
+    for (size_t i = 0; i < m_spectra.size(); ++i) {
+        const auto & spectrum = m_spectra[i];
+
+        //Get the waveform for this size
         auto vals = spectrum->filter_waveform(shape[0]);
-        for (size_t i = 0; i != vals.size(); i++) {
+        
+        //Fill a tensor from it
+        auto this_tensor = torch::ones(shape);
+        auto accessor = this_tensor.accessor<float,1>();
+        for (size_t i = 0; i < vals.size(); i++) {
             accessor[i] *= vals.at(i);
+        }
+
+        //Multiply the cached tensor by the FFT of this tensor
+        if (i == 0) {
+            m_cache.insert(shape, torch::fft::rfft(this_tensor));
+        }
+        else {
+            m_cache.get(shape).value() *= torch::fft::rfft(this_tensor);
         }
     }
 
-    return m_total_spectrum;
+    return m_cache.get(shape).value();
 }

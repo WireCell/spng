@@ -34,7 +34,7 @@ namespace WireCell {
         private:
 
             void redigitize(const std::vector<int64_t> & input_shape);
-            torch::Tensor m_total_response, m_applied_response;
+            torch::Tensor m_total_response;
             boost::compute::detail::lru_cache<std::vector<int64_t>, torch::Tensor> m_cache;
             std::string m_field_response_name{"FieldResponse"};
             std::string m_elec_response_name{"ColdElecResponse"};

@@ -24,8 +24,6 @@ namespace SPNG {
             return cfg;
         };
     private:
-        // std::string m_field_response{"FieldResponse"};
-        // std::string m_coldelec_response{"ColdElecResponse"};
         std::string m_frer_spectrum{"FRERSpectrum"};
         std::string m_wire_filter{"Torch1DSpectrum"};
         std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;

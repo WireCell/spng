@@ -226,7 +226,8 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     
     const std::string fname = "test_output_frer.npz";
     Array::array_xxf arr = Array::array_xxf::Zero(m_default_nchans, m_default_nticks);
-    auto applied_response_accessor = m_applied_response.accessor<float,2>();
+    torch::Tensor applied_response = spectrum(default_shape);
+    auto applied_response_accessor = applied_response.accessor<float,2>();
     for (int irow = 0; irow < m_default_nchans; ++irow) {
         for (int icol = 0; icol < m_default_nticks; ++icol) {
             arr(irow, icol) = applied_response_accessor[irow][icol];
@@ -240,15 +241,24 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     // cnpy::npz_save(fname, aname, channels.data(), {nrows}, mode);
 }
 
-void SPNG::TorchFRERSpectrum::redigitize(const std::vector<int64_t> & input_shape) {
+void SPNG::TorchFRERSpectrum::redigitize(
+    const std::vector<int64_t> & input_shape
+) {
 
     //TODO -- check that input shape is 2-dim
     // and anything else i.e. > fravg shape?
     // auto nchans = input_shape[0];
     auto nticks = input_shape[1];
 
-    m_applied_response = torch::zeros(input_shape);
-    auto applied_response_accessor = m_applied_response.accessor<float,2>();
+    //This means we've gotten here by mistake -- TODO consider throwing
+    if (m_cache.contains(input_shape)) {
+        return;
+    }
+
+    auto the_tensor = torch::zeros(input_shape);
+    //If not, we need to create a new version
+    // auto result_accessor = m_cache.get(input_shape).value().accessor<float,2>();
+    auto result_accessor = the_tensor.accessor<float,2>();
     auto total_response_accessor = m_total_response.accessor<float,2>();
     for (int irow = 0; irow < m_fravg_nchans; ++irow) {
         int fcount = 1;
@@ -261,7 +271,7 @@ void SPNG::TorchFRERSpectrum::redigitize(const std::vector<int64_t> & input_shap
                     if (fcount >= m_fravg_nticks) break;
                 }
 
-                applied_response_accessor[irow][i] = (
+                result_accessor[irow][i] = (
                     (ctime - m_fravg_period*(fcount - 1)) / m_fravg_period * total_response_accessor[irow][fcount - 1] +
                     (m_fravg_period*fcount - ctime) / m_fravg_period * total_response_accessor[irow][fcount]
                 );
@@ -269,10 +279,25 @@ void SPNG::TorchFRERSpectrum::redigitize(const std::vector<int64_t> & input_shap
 
         }
     }
+    m_cache.insert(input_shape, the_tensor);
 }
 
 torch::Tensor SPNG::TorchFRERSpectrum::spectrum(const std::vector<int64_t> & shape) {
-    return torch::zeros(shape);
+
+    //TODO -- check that input shape is 2-dim
+
+    //If this shape has been used recenty, return the cached value
+    if (m_cache.contains(shape)) {
+        return m_cache.get(shape).value();
+    }
+
+    //If not, we need to create a new version -- this is done in redigitize
+    redigitize(shape);
+
+    //Finally, return the result
+    return m_cache.get(shape).value();
 }
 
-torch::Tensor SPNG::TorchFRERSpectrum::spectrum() const { return m_applied_response; }
+torch::Tensor SPNG::TorchFRERSpectrum::spectrum() const {
+    return torch::zeros({m_default_nchans, m_default_nticks});
+}

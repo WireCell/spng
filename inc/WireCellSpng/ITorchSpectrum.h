@@ -18,10 +18,16 @@ public:
 
     /// Return the coldelec response data
     virtual torch::Tensor spectrum() const = 0;
+    // virtual torch::Tensor spectrum(const std::vector<int64_t> & shape) = 0;
+
     virtual torch::Tensor spectrum(const std::vector<int64_t> & shape) = 0;
 
     /// Get the base shape of the response
     virtual const std::vector<int64_t> & shape() const {return m_shape;};
+
+    /// Get any shifts of the response
+    virtual std::vector<int64_t> shifts() const = 0;
+
 protected:
     std::vector<int64_t> m_shape;
 };

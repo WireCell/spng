@@ -32,7 +32,10 @@
             private:
              torch::Tensor m_total_spectrum;
              std::vector<std::shared_ptr<IFilterWaveform>> m_spectra{};
-             int m_default_length = 0;
+             std::vector<torch::Tensor> m_spectrum_tensors{};
+             boost::compute::detail::lru_cache<std::vector<int64_t>, torch::Tensor> m_cache;
+
+             int64_t m_default_length = 0;
              //List holding the type & name of spectra i.e. {HfFilter, Wiener_tight_V}
             //  std::vector<std::pair<std::string, std::string>> m_spectra_names {};
              std::vector<std::string> m_spectra_tns{};

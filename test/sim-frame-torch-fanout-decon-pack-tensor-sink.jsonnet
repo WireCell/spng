@@ -184,11 +184,36 @@ local torch_frers = [[{
     }
   } for iplane in std.range(0,2)] for anode in tools.anodes];
 
-local spfilt = import 'pgrapher/experiment/pdhd/sp-filters.jsonnet';
+// local spfilt = import 'pgrapher/experiment/pdhd/sp-filters.jsonnet';
+
+// local wire_filters = [
+//   spfilt.wf[-2],
+//   spfilt.wf[-1],
+//   // spfilt.wf('Wire_ind', { sigma: 1.0 / wc.sqrtpi * 0.75 }), 
+//   // spfilt.wf('Wire_col', { sigma: 1.0 / wc.sqrtpi * 10.0 })
+// ];
 
 local wire_filters = [
-  spfilt.wf('Wire_ind', { sigma: 1.0 / wc.sqrtpi * 0.75 }), 
-  spfilt.wf('Wire_col', { sigma: 1.0 / wc.sqrtpi * 10.0 })
+  {
+    type: 'HfFilter',
+    name: 'Wire_ind',
+    data: {
+      max_freq: 1,  // warning: units
+      power: 2,
+      flag: false,
+      sigma: 1.0 / wc.sqrtpi * 0.75,  // caller should provide
+    }
+  },
+  {
+    type: 'HfFilter',
+    name: 'Wire_col',
+    data: {
+      max_freq: 1,  // warning: units
+      power: 2,
+      flag: false,
+      sigma: 1.0 / wc.sqrtpi * 10.0,  // caller should provide
+    }
+  },
 ];
 
 local torch_wire_filters = [
@@ -198,7 +223,7 @@ local torch_wire_filters = [
     uses: [wire_filters[0]],
     data: {
       spectra: [
-        'Wire_ind',
+        wc.tn(wire_filters[0]),
       ]
     },
   },
@@ -208,7 +233,7 @@ local torch_wire_filters = [
     uses: [wire_filters[1]],
     data: {
       spectra: [
-        'Wire_col',
+        wc.tn(wire_filters[1]),
       ]
     },
   },
@@ -216,32 +241,32 @@ local torch_wire_filters = [
 
 local torch_decons = [
   ([g.pnode({
-  type: 'SPNGDecon',
-  name: 'spng_decon_apa%d_plane%d' % [anode.data.ident, iplane],
-  data: {
-    // field_response: wc.tn(torch_fields[anode.data.ident][iplane]),
-    // coldelec_response: wc.tn(torch_coldelec),
-    frer_spectrum: wc.tn(torch_frers[anode.data.ident][iplane]),
-    wire_filter: torch_wire_filters[0], #put in if statement
+    type: 'SPNGDecon',
+    name: 'spng_decon_apa%d_plane%d' % [anode.data.ident, iplane],
+    data: {
+      frer_spectrum: wc.tn(torch_frers[anode.data.ident][iplane]),
+      wire_filter: wc.tn(if iplane == 2 then torch_wire_filters[1] else torch_wire_filters[0]), #put in if statement
+    },
   },
-}, nin=1, nout=1, uses=[torch_frers[anode.data.ident][iplane], torch_wire_filters[0]]) for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
+  nin=1, nout=1,
+  uses=[torch_frers[anode.data.ident][iplane], if iplane == 2 then torch_wire_filters[1] else torch_wire_filters[0]])
+  for iplane in std.range(0, 2)] + [ //Duplicate the collection plane
   g.pnode({
   type: 'SPNGDecon',
   name: 'spng_decon_apa%d_plane%d_opp' % [anode.data.ident, 2],
   data: {
-    // field_response: wc.tn(torch_fields[anode.data.ident][2]),
-    // coldelec_response: wc.tn(torch_coldelec),
     frer_spectrum: wc.tn(torch_frers[anode.data.ident][2]),
-    wire_filter: torch_wire_filters[1]
+    wire_filter: wc.tn(torch_wire_filters[1])
   },
   }, nin=1, nout=1, uses=[torch_frers[anode.data.ident][2], torch_wire_filters[1]])
 ])
  for anode in tools.anodes];
 
-local tfs_to_decons = g.intern(
-  innodes=tf_fans,
-  outnodes=std.flattenArrays(torch_decons),
-  edges = [
+local tfs_to_tensors = g.intern(
+    innodes=tf_fans,
+    centernodes=std.flattenArrays(torch_decons),
+    outnodes=torch_to_tensors,
+    edges=[
       g.edge(tf_fans[0], torch_decons[0][0], 0),
       g.edge(tf_fans[0], torch_decons[0][1], 1),
       g.edge(tf_fans[0], torch_decons[0][2], 2),
@@ -258,74 +283,26 @@ local tfs_to_decons = g.intern(
       g.edge(tf_fans[3], torch_decons[3][1], 1),
       g.edge(tf_fans[3], torch_decons[3][2], 2),
       g.edge(tf_fans[3], torch_decons[3][3], 3),
-  ],
+
+      g.edge(torch_decons[0][0], torch_to_tensors[0]),
+      g.edge(torch_decons[0][1], torch_to_tensors[1]),
+      g.edge(torch_decons[0][2], torch_to_tensors[2]),
+      g.edge(torch_decons[0][3], torch_to_tensors[3]),
+      g.edge(torch_decons[1][0], torch_to_tensors[4]),
+      g.edge(torch_decons[1][1], torch_to_tensors[5]),
+      g.edge(torch_decons[1][2], torch_to_tensors[6]),
+      g.edge(torch_decons[1][3], torch_to_tensors[7]),
+      g.edge(torch_decons[2][0], torch_to_tensors[8]),
+      g.edge(torch_decons[2][1], torch_to_tensors[9]),
+      g.edge(torch_decons[2][2], torch_to_tensors[10]),
+      g.edge(torch_decons[2][3], torch_to_tensors[11]),
+      g.edge(torch_decons[3][0], torch_to_tensors[12]),
+      g.edge(torch_decons[3][1], torch_to_tensors[13]),
+      g.edge(torch_decons[3][2], torch_to_tensors[14]),
+      g.edge(torch_decons[3][3], torch_to_tensors[15]),
+
+    ],
 );
-
-local tfs_to_tensors = g.intern(
-    innodes=[tfs_to_decons],
-    outnodes=torch_to_tensors,
-    edges=[
-      g.edge(tfs_to_decons, torch_to_tensors[0], 0),
-      g.edge(tfs_to_decons, torch_to_tensors[1], 1),
-      g.edge(tfs_to_decons, torch_to_tensors[2], 2),
-      g.edge(tfs_to_decons, torch_to_tensors[3], 3),
-      g.edge(tfs_to_decons, torch_to_tensors[4], 4),
-      g.edge(tfs_to_decons, torch_to_tensors[5], 5),
-      g.edge(tfs_to_decons, torch_to_tensors[6], 6),
-      g.edge(tfs_to_decons, torch_to_tensors[7], 7),
-      g.edge(tfs_to_decons, torch_to_tensors[8], 8),
-      g.edge(tfs_to_decons, torch_to_tensors[9], 9),
-      g.edge(tfs_to_decons, torch_to_tensors[10], 10),
-      g.edge(tfs_to_decons, torch_to_tensors[11], 11),
-      g.edge(tfs_to_decons, torch_to_tensors[12], 12),
-      g.edge(tfs_to_decons, torch_to_tensors[13], 13),
-      g.edge(tfs_to_decons, torch_to_tensors[14], 14),
-      g.edge(tfs_to_decons, torch_to_tensors[15], 15),
-
-    ]
-);
-
-// local tfs_to_tensors = g.intern(
-//     innodes=tf_fans,
-//     centernodes=std.flattenArrays(torch_decons),
-//     outnodes=torch_to_tensors,
-//     edges=[
-//       g.edge(tf_fans[0], torch_decons[0][0], 0),
-//       g.edge(tf_fans[0], torch_decons[0][1], 1),
-//       g.edge(tf_fans[0], torch_decons[0][2], 2),
-//       g.edge(tf_fans[0], torch_decons[0][3], 3),
-//       g.edge(tf_fans[1], torch_decons[1][0], 0),
-//       g.edge(tf_fans[1], torch_decons[1][1], 1),
-//       g.edge(tf_fans[1], torch_decons[1][2], 2),
-//       g.edge(tf_fans[1], torch_decons[1][3], 3),
-//       g.edge(tf_fans[2], torch_decons[2][0], 0),
-//       g.edge(tf_fans[2], torch_decons[2][1], 1),
-//       g.edge(tf_fans[2], torch_decons[2][2], 2),
-//       g.edge(tf_fans[2], torch_decons[2][3], 3),
-//       g.edge(tf_fans[3], torch_decons[3][0], 0),
-//       g.edge(tf_fans[3], torch_decons[3][1], 1),
-//       g.edge(tf_fans[3], torch_decons[3][2], 2),
-//       g.edge(tf_fans[3], torch_decons[3][3], 3),
-
-//       g.edge(torch_decons[0][0], torch_to_tensors[0]),
-//       g.edge(torch_decons[0][1], torch_to_tensors[1]),
-//       g.edge(torch_decons[0][2], torch_to_tensors[2]),
-//       g.edge(torch_decons[0][3], torch_to_tensors[3]),
-//       g.edge(torch_decons[1][0], torch_to_tensors[4]),
-//       g.edge(torch_decons[1][1], torch_to_tensors[5]),
-//       g.edge(torch_decons[1][2], torch_to_tensors[6]),
-//       g.edge(torch_decons[1][3], torch_to_tensors[7]),
-//       g.edge(torch_decons[2][0], torch_to_tensors[8]),
-//       g.edge(torch_decons[2][1], torch_to_tensors[9]),
-//       g.edge(torch_decons[2][2], torch_to_tensors[10]),
-//       g.edge(torch_decons[2][3], torch_to_tensors[11]),
-//       g.edge(torch_decons[3][0], torch_to_tensors[12]),
-//       g.edge(torch_decons[3][1], torch_to_tensors[13]),
-//       g.edge(torch_decons[3][2], torch_to_tensors[14]),
-//       g.edge(torch_decons[3][3], torch_to_tensors[15]),
-
-//     ],
-// );
 
 local tfs_to_tensors_to_sinks = g.intern(
     innodes=[tfs_to_tensors],

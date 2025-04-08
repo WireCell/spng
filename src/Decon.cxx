@@ -36,37 +36,41 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         return true;
     }
     log->debug("Running Decon");
+
     //Get the cloned tensor from the input
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
-    for (const auto & s : tensor_clone.sizes()) std::cout << s << std::endl;
-    // std::cout << tensor_clone << std::endl;
+    auto sizes = tensor_clone.sizes();
+    std::vector<int64_t> shape;
+    for (const auto & s : sizes) {
+        shape.push_back(s);
+    }
     //FFT on time dim
     tensor_clone = torch::fft::rfft(tensor_clone, std::nullopt, 1);
 
     //FFT on chan dim
-    for (const auto & s : tensor_clone.sizes()) std::cout << s << std::endl;
-    std::cout << "Running wire-fft on time-fft'd input" << std::endl;
-
     tensor_clone = torch::fft::fft(tensor_clone, std::nullopt, 0);
-    for (const auto & s : tensor_clone.sizes()) std::cout << s << std::endl;
-    std::cout << "Done" << std::endl;
-    // std::cout << tensor_clone << std::endl;
 
-    auto frer_spectrum_tensor = base_frer_spectrum->spectrum().clone();
-    std::cout << "frer sizes" << std::endl;
-    for (const auto & s : frer_spectrum_tensor.sizes()) std::cout << s << std::endl;
+    //Get the Field x Elec. Response and do FFT in both dimensons
+    auto frer_spectrum_tensor = base_frer_spectrum->spectrum(shape).clone();
+    // std::cout << "frer_spectrum_tensor: " << frer_spectrum_tensor << std::endl;
     frer_spectrum_tensor = torch::fft::rfft2(frer_spectrum_tensor);
-    for (const auto & s : frer_spectrum_tensor.sizes()) std::cout << s << std::endl;
 
-    // std::cout << frer_spectrum_tensor << std::endl;
+    int wire_shift = (base_frer_spectrum.get_fravg_nchans() - 1) / 2;
 
+    //Apply to input data
     tensor_clone /= frer_spectrum_tensor;
-    // std::cout << tensor_clone << std::endl;
 
+    //Get the Wire filter -- already FFT'd
+    auto wire_filter_tensor = base_wire_filter->spectrum({shape[0]}).clone();
+
+    //Multiply along the wire dimension
+    tensor_clone *= wire_filter_tensor.view({-1,1});
+
+    //Inverse FFT in both dimensions
     tensor_clone = torch::fft::irfft2(tensor_clone);
 
-    // std::cout << tensor_clone << std::endl;
-
+    //Shift along wire dimension
+    tensor_clone = tensor_clone.roll(wire_shift, 0);    
     // TODO: set md
     Configuration set_md;
 
