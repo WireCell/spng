@@ -301,3 +301,8 @@ torch::Tensor SPNG::TorchFRERSpectrum::spectrum(const std::vector<int64_t> & sha
 torch::Tensor SPNG::TorchFRERSpectrum::spectrum() const {
     return torch::zeros({m_default_nchans, m_default_nticks});
 }
+
+/// Get any shifts of the response
+std::vector<int64_t> SPNG::TorchFRERSpectrum::shifts() const {
+    return {(m_fravg_nchans - 1)/2};
+};

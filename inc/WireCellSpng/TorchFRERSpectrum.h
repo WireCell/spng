@@ -30,7 +30,9 @@ namespace WireCell {
             // IConfigurable
             virtual void configure(const WireCell::Configuration& config);
             virtual WireCell::Configuration default_configuration() const;
-
+            
+            /// Get any shifts of the response
+            virtual std::vector<int64_t> shifts() const;
         private:
 
             void redigitize(const std::vector<int64_t> & input_shape);

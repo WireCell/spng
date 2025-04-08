@@ -55,7 +55,8 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     // std::cout << "frer_spectrum_tensor: " << frer_spectrum_tensor << std::endl;
     frer_spectrum_tensor = torch::fft::rfft2(frer_spectrum_tensor);
 
-    int wire_shift = (base_frer_spectrum.get_fravg_nchans() - 1) / 2;
+    //Get the wire shift
+    int wire_shift = base_frer_spectrum->shifts()[0];
 
     //Apply to input data
     tensor_clone /= frer_spectrum_tensor;

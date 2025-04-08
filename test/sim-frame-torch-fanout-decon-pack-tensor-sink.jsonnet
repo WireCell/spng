@@ -139,30 +139,30 @@ local torch_to_tensors = [g.pnode({
 }, nin=1, nout=1) for n in std.range(0, 15)];
 
 // One FR per field file.
-local torch_fields = [[{
-    type: "TorchFieldResponse",
-    name: "torch_field%d_plane%d" % [anode.data.ident, iplane],
-    uses: [tools.fields[anode.data.ident]],
-    data: {
-      field_response: wc.tn(tools.fields[anode.data.ident]),#"FieldResponse:field%d"% anode.data.ident,
-      plane: iplane,
-      do_average: true,
-      do_fft: true,
-    }
-  } for iplane in std.range(0,2)] for anode in tools.anodes];
+// local torch_fields = [[{
+//     type: "TorchFieldResponse",
+//     name: "torch_field%d_plane%d" % [anode.data.ident, iplane],
+//     uses: [tools.fields[anode.data.ident]],
+//     data: {
+//       field_response: wc.tn(tools.fields[anode.data.ident]),#"FieldResponse:field%d"% anode.data.ident,
+//       plane: iplane,
+//       do_average: true,
+//       do_fft: true,
+//     }
+//   } for iplane in std.range(0,2)] for anode in tools.anodes];
 
-local torch_coldelec = {
-  type: "TorchColdElecResponse",
-  name: 'torch_coldelec_response',
-  uses: [tools.elec_resp],
-  data: {
-    nticks: 10,
-    tick_period: 500,
-    do_fft: true,
-    gain: 1.2496976598600002e-12,
-    shaping: 2200,
-  }
-};
+// local torch_coldelec = {
+//   type: "TorchColdElecResponse",
+//   name: 'torch_coldelec_response',
+//   uses: [tools.elec_resp],
+//   data: {
+//     nticks: 10,
+//     tick_period: 500,
+//     do_fft: true,
+//     gain: 1.2496976598600002e-12,
+//     shaping: 2200,
+//   }
+// };
 
 local nchans = [800, 800, 480];
 
