@@ -26,6 +26,8 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
 
     m_wire_filter = get(config, "wire_filter", m_wire_filter);
     base_wire_filter = Factory::find_tn<ITorchSpectrum>(m_wire_filter);
+
+    m_coarse_time_offset = get(config, "coarse_time_offset", m_coarse_time_offset);
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {
@@ -71,7 +73,16 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     tensor_clone = torch::fft::irfft2(tensor_clone);
 
     //Shift along wire dimension
-    tensor_clone = tensor_clone.roll(wire_shift, 0);    
+    tensor_clone = tensor_clone.roll(wire_shift, 0);
+
+    //Shift along time dimension
+    int time_shift = (int) (
+        (m_coarse_time_offset + base_frer_spectrum->shifts()[1]) /
+        in->metadata()["period"].asDouble()
+    );
+    tensor_clone = tensor_clone.roll(time_shift, 1);
+
+
     // TODO: set md
     Configuration set_md;
 

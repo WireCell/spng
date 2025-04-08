@@ -304,5 +304,11 @@ torch::Tensor SPNG::TorchFRERSpectrum::spectrum() const {
 
 /// Get any shifts of the response
 std::vector<int64_t> SPNG::TorchFRERSpectrum::shifts() const {
-    return {(m_fravg_nchans - 1)/2};
+    std::cout << "origin " << m_field_response.origin << " speed " <<
+                 m_field_response.speed << " ratio " <<
+                 m_field_response.origin/m_field_response.speed << std::endl;
+    return {
+        (m_fravg_nchans - 1)/2,
+        int(m_field_response.origin/m_field_response.speed)//Maybe std::round here?
+    };
 };

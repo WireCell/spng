@@ -27,6 +27,7 @@ namespace SPNG {
         std::string m_frer_spectrum{"FRERSpectrum"};
         std::string m_wire_filter{"Torch1DSpectrum"};
         std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;
+        int m_coarse_time_offset = 0;
     };
 }
 }

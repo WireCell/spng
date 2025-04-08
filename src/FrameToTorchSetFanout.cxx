@@ -167,6 +167,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         
         // TODO: set md
         Configuration set_md;
+        set_md["period"] = in->tick();
 
         //Clone the tensor to take ownership of the memory and put into 
         //output 

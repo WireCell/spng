@@ -246,6 +246,7 @@ local torch_decons = [
     data: {
       frer_spectrum: wc.tn(torch_frers[anode.data.ident][iplane]),
       wire_filter: wc.tn(if iplane == 2 then torch_wire_filters[1] else torch_wire_filters[0]), #put in if statement
+      coarse_time_offset: 1000,
     },
   },
   nin=1, nout=1,
@@ -256,7 +257,8 @@ local torch_decons = [
   name: 'spng_decon_apa%d_plane%d_opp' % [anode.data.ident, 2],
   data: {
     frer_spectrum: wc.tn(torch_frers[anode.data.ident][2]),
-    wire_filter: wc.tn(torch_wire_filters[1])
+    wire_filter: wc.tn(torch_wire_filters[1]),
+    coarse_time_offset: 1000,
   },
   }, nin=1, nout=1, uses=[torch_frers[anode.data.ident][2], torch_wire_filters[1]])
 ])
