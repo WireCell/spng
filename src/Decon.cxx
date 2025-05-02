@@ -61,13 +61,13 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     int wire_shift = base_frer_spectrum->shifts()[0];
 
     //Apply to input data
-    tensor_clone /= frer_spectrum_tensor;
+    tensor_clone = tensor_clone / frer_spectrum_tensor;
 
     //Get the Wire filter -- already FFT'd
     auto wire_filter_tensor = base_wire_filter->spectrum({shape[0]}).clone();
 
     //Multiply along the wire dimension
-    tensor_clone *= wire_filter_tensor.view({-1,1});
+    tensor_clone = tensor_clone * wire_filter_tensor.view({-1,1});
 
     //Inverse FFT in both dimensions
     tensor_clone = torch::fft::irfft2(tensor_clone);
