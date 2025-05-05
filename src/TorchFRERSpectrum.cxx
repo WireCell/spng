@@ -224,20 +224,21 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     std::vector<int64_t> default_shape = {m_default_nchans, m_default_nticks};
     redigitize(default_shape);
     
-    const std::string fname = "test_output_frer.npz";
-    Array::array_xxf arr = Array::array_xxf::Zero(m_default_nchans, m_default_nticks);
-    torch::Tensor applied_response = spectrum(default_shape);
-    auto applied_response_accessor = applied_response.accessor<float,2>();
-    for (int irow = 0; irow < m_default_nchans; ++irow) {
-        for (int icol = 0; icol < m_default_nticks; ++icol) {
-            arr(irow, icol) = applied_response_accessor[irow][icol];
-        }
-    }
-    const std::string mode = "a";
-    const std::string aname = String::format(
-        "apa_%i_plane_%i", m_anode_num, m_plane_id
-    );
-    WireCell::Numpy::save2d(arr, aname, fname, mode);
+    // const std::string fname = "test_output_frer.npz";
+    // Array::array_xxf arr = Array::array_xxf::Zero(m_default_nchans, m_default_nticks);
+    // torch::Tensor applied_response = spectrum(default_shape);
+    // std::cout << "APPLIED RESPONSE DEVICE " << applied_response.device() << std::endl;
+    // auto applied_response_accessor = applied_response.accessor<float,2>();
+    // for (int irow = 0; irow < m_default_nchans; ++irow) {
+    //     for (int icol = 0; icol < m_default_nticks; ++icol) {
+    //         arr(irow, icol) = applied_response_accessor[irow][icol];
+    //     }
+    // }
+    // const std::string mode = "a";
+    // const std::string aname = String::format(
+    //     "apa_%i_plane_%i", m_anode_num, m_plane_id
+    // );
+    // WireCell::Numpy::save2d(arr, aname, fname, mode);
     // cnpy::npz_save(fname, aname, channels.data(), {nrows}, mode);
 }
 
@@ -279,7 +280,10 @@ void SPNG::TorchFRERSpectrum::redigitize(
 
         }
     }
-    m_cache.insert(input_shape, the_tensor);
+    bool has_cuda = torch::cuda::is_available();
+    torch::Device device((has_cuda ? torch::kCUDA : torch::kCPU));
+    // the_tensor.to(device);
+    m_cache.insert(input_shape, the_tensor.to(device));
 }
 
 torch::Tensor SPNG::TorchFRERSpectrum::spectrum(const std::vector<int64_t> & shape) {

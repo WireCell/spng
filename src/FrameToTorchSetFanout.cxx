@@ -6,7 +6,7 @@
 #include "WireCellAux/FrameTools.h"
 #include "WireCellAux/SimpleFrame.h"
 #include "WireCellIface/INamed.h"
-
+#include <cuda.h>
 
 WIRECELL_FACTORY(FrameToTorchSetFanout, WireCell::SPNG::FrameToTorchSetFanout,
                  WireCell::INamed,
@@ -129,8 +129,8 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     std::vector<at::TensorAccessor<float,2>> accessors;
     std::vector<torch::Tensor> tensors;
     //Build up tenors + accessors to store input trace values
-    for (const auto & [out_group, nchannels] : m_output_nchannels) {
 
+    for (const auto & [out_group, nchannels] : m_output_nchannels) {
         log->debug("Making tensor of shape: {} {}", nchannels, m_expected_nticks);
         torch::Tensor plane_tensor = torch::zeros({nchannels, m_expected_nticks});
         tensors.push_back(plane_tensor);
@@ -161,7 +161,9 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
             accessors[output_group][output_index][tbin + j] = charge_seq[j];
         }
     }
+    bool has_cuda = torch::cuda::is_available();
 
+    torch::Device device((has_cuda ? torch::kCUDA : torch::kCPU));
     //Build up Tensors according to the output groups
     for (const auto & [output_index, nchannels] : m_output_nchannels) {
         
@@ -172,7 +174,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         //Clone the tensor to take ownership of the memory and put into 
         //output 
         std::vector<ITorchTensor::pointer> itv{
-            std::make_shared<SimpleTorchTensor>(tensors[output_index].clone())
+            std::make_shared<SimpleTorchTensor>(tensors[output_index].to(device)) //.clone())
         };
         outv[output_index] = std::make_shared<SimpleTorchTensorSet>(
             in->ident(), set_md,

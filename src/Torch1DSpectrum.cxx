@@ -61,10 +61,12 @@ torch::Tensor SPNG::Torch1DSpectrum::spectrum(const std::vector<int64_t> & shape
     }
 
     //If not, we need to create a new version
-    m_cache.insert(shape, torch::ones(shape));
+    // m_cache.insert(shape, torch::ones(shape));
 
     //Loop over the spectra
-    
+    bool has_cuda = torch::cuda::is_available();
+
+    torch::Device device((has_cuda ? torch::kCUDA : torch::kCPU));
     for (size_t i = 0; i < m_spectra.size(); ++i) {
         const auto & spectrum = m_spectra[i];
 
@@ -80,12 +82,11 @@ torch::Tensor SPNG::Torch1DSpectrum::spectrum(const std::vector<int64_t> & shape
 
         //Multiply the cached tensor by the FFT of this tensor
         if (i == 0) {
-            m_cache.insert(shape, torch::fft::rfft(this_tensor));
+            m_cache.insert(shape, torch::fft::fft(this_tensor.to(device)));
         }
         else {
-            m_cache.get(shape).value() *= torch::fft::rfft(this_tensor);
+            m_cache.get(shape).value() *= torch::fft::fft(this_tensor.to(device));
         }
     }
-
     return m_cache.get(shape).value();
 }

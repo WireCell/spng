@@ -54,7 +54,6 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
 
     //Get the Field x Elec. Response and do FFT in both dimensons
     auto frer_spectrum_tensor = base_frer_spectrum->spectrum(shape).clone();
-    // std::cout << "frer_spectrum_tensor: " << frer_spectrum_tensor << std::endl;
     frer_spectrum_tensor = torch::fft::rfft2(frer_spectrum_tensor);
 
     //Get the wire shift
@@ -64,7 +63,7 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     tensor_clone = tensor_clone / frer_spectrum_tensor;
 
     //Get the Wire filter -- already FFT'd
-    auto wire_filter_tensor = base_wire_filter->spectrum({shape[0]}).clone();
+    auto wire_filter_tensor = base_wire_filter->spectrum({shape[0]});
 
     //Multiply along the wire dimension
     tensor_clone = tensor_clone * wire_filter_tensor.view({-1,1});
@@ -89,7 +88,7 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     //Clone the tensor to take ownership of the memory and put into 
     //output 
     std::vector<ITorchTensor::pointer> itv{
-        std::make_shared<SimpleTorchTensor>(tensor_clone.clone())
+        std::make_shared<SimpleTorchTensor>(tensor_clone)
     };
     out = std::make_shared<SimpleTorchTensorSet>(
         in->ident(), set_md,

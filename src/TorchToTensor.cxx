@@ -35,8 +35,8 @@ bool TorchToTensor::operator()(const input_pointer& torchset_in, output_pointer&
     //Go through each input tensor
     ITensor::vector tensor_vec;
     for (const auto & tensor_ptr : (*torchset_in->tensors())) {
-
-        auto tensor_clone = tensor_ptr->tensor().clone().contiguous();
+        //Make sure to move to CPU
+        auto tensor_clone = tensor_ptr->tensor().clone().to(torch::kCPU).contiguous();
         // const auto shape = ten->shape();
     
         std::vector<float> as_vec(
