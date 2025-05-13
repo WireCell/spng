@@ -127,18 +127,18 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
 
 
                 if (std::abs(path.current[icol]) > 1.) {
+                    log->warn(String::format("Setting large value %f to 0.", path.current[icol]));
                     accessor[irow][icol] = 0.;
-                    log->warn("Setting large value to 0.");
                 }
                 else {
                     accessor[irow][icol] = path.current[icol];
                 }
 
-                arr_alt(irow, icol) = accessor[irow][icol];
+                arr_alt(irow, icol) = path.current[icol];
             }
         }
 
-        
+        //Saving FR -- with & without large val protection
         {
             const std::string fname = "test_output_fr_alt.npz";
             const std::string mode = "a";
@@ -157,16 +157,6 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
             for (int irow = 0; irow < m_fravg_nchans; ++irow) {
                 for (int icol = 0; icol < m_fravg_nticks; ++icol) {
                     arr(irow, icol) = accessor[irow][icol];
-                    if (arr(irow, icol) == std::numeric_limits<float>::max()) {
-                        THROW(ValueError() <<
-                        errmsg{String::format("TorchFRERSpectrum::%s: ", m_field_response_name)} <<
-                        errmsg{String::format("Found max float val at {} {}", irow, icol)});
-                    }
-                    else if (arr(irow, icol) == std::numeric_limits<float>::min()) {
-                        THROW(ValueError() <<
-                        errmsg{String::format("TorchFRERSpectrum::%s: ", m_field_response_name)} <<
-                        errmsg{String::format("Found min float val at {} {}", irow, icol)});
-                    }
                 }
             }
             const std::string aname = String::format(
@@ -192,9 +182,10 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     auto ewave = m_elec_response->waveform_samples(tbins);
     auto accessor = elec_response_tensor.accessor<float,1>();
     for (int i = 0; i < m_fravg_nticks; ++i) {
-        accessor[i] = ewave[i];
+        accessor[i] = ewave[i]/* * m_inter_gain * m_ADC_mV * (-1)*/;
     }
-    elec_response_tensor *= m_inter_gain * m_ADC_mV * (-1);
+    // elec_response_tensor *= m_inter_gain * m_ADC_mV * (-1);
+    elec_response_tensor = (elec_response_tensor * m_inter_gain * m_ADC_mV * (-1));
     // std::cout << elec_response_tensor << std::endl;
 
     {
@@ -224,22 +215,21 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     std::vector<int64_t> default_shape = {m_default_nchans, m_default_nticks};
     redigitize(default_shape);
     
-    // const std::string fname = "test_output_frer.npz";
-    // Array::array_xxf arr = Array::array_xxf::Zero(m_default_nchans, m_default_nticks);
-    // torch::Tensor applied_response = spectrum(default_shape);
-    // std::cout << "APPLIED RESPONSE DEVICE " << applied_response.device() << std::endl;
-    // auto applied_response_accessor = applied_response.accessor<float,2>();
-    // for (int irow = 0; irow < m_default_nchans; ++irow) {
-    //     for (int icol = 0; icol < m_default_nticks; ++icol) {
-    //         arr(irow, icol) = applied_response_accessor[irow][icol];
-    //     }
-    // }
-    // const std::string mode = "a";
-    // const std::string aname = String::format(
-    //     "apa_%i_plane_%i", m_anode_num, m_plane_id
-    // );
-    // WireCell::Numpy::save2d(arr, aname, fname, mode);
-    // cnpy::npz_save(fname, aname, channels.data(), {nrows}, mode);
+    const std::string fname = "test_output_frer.npz";
+    Array::array_xxf arr = Array::array_xxf::Zero(default_shape[0], default_shape[1]);
+    auto output = m_cache.get(default_shape).value().to(torch::kCPU);
+    auto output_accessor = output.accessor<float,2>();
+    for (int irow = 0; irow < default_shape[0]; ++irow) {
+        for (int icol = 0; icol < default_shape[1]; ++icol) {
+            arr(irow, icol) = output_accessor[irow][icol];
+        }
+    }
+    const std::string mode = "a";
+    const std::string aname = String::format(
+        "apa_%i_plane_%i_%i_%i", m_anode_num, m_plane_id, default_shape[0], default_shape[1]
+    );
+    WireCell::Numpy::save2d(arr, aname, fname, mode);
+
 }
 
 void SPNG::TorchFRERSpectrum::redigitize(
@@ -298,6 +288,20 @@ torch::Tensor SPNG::TorchFRERSpectrum::spectrum(const std::vector<int64_t> & sha
     //If not, we need to create a new version -- this is done in redigitize
     redigitize(shape);
 
+    const std::string fname = "test_output_frer.npz";
+    Array::array_xxf arr = Array::array_xxf::Zero(shape[0], shape[1]);
+    auto output = m_cache.get(shape).value().to(torch::kCPU);
+    auto output_accessor = output.accessor<float,2>();
+    for (int irow = 0; irow < shape[0]; ++irow) {
+        for (int icol = 0; icol < shape[1]; ++icol) {
+            arr(irow, icol) = output_accessor[irow][icol];
+        }
+    }
+    const std::string mode = "a";
+    const std::string aname = String::format(
+        "apa_%i_plane_%i_%i_%i", m_anode_num, m_plane_id, shape[0], shape[1]
+    );
+    WireCell::Numpy::save2d(arr, aname, fname, mode);
     //Finally, return the result
     return m_cache.get(shape).value();
 }

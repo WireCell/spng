@@ -77,15 +77,15 @@ torch::Tensor SPNG::Torch1DSpectrum::spectrum(const std::vector<int64_t> & shape
         auto this_tensor = torch::ones(shape);
         auto accessor = this_tensor.accessor<float,1>();
         for (size_t i = 0; i < vals.size(); i++) {
-            accessor[i] *= vals.at(i);
+            accessor[i] = vals.at(i);
         }
 
         //Multiply the cached tensor by the FFT of this tensor
         if (i == 0) {
-            m_cache.insert(shape, torch::fft::fft(this_tensor.to(device)));
+            m_cache.insert(shape, /*torch::fft::fft*/(this_tensor.to(device)));
         }
         else {
-            m_cache.get(shape).value() *= torch::fft::fft(this_tensor.to(device));
+            m_cache.get(shape).value() *= /*torch::fft::fft*/(this_tensor.to(device));
         }
     }
     return m_cache.get(shape).value();

@@ -122,7 +122,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
             continue;  // Can be "back" or "front" face.
         }
         for (auto plane : face->planes()) {
-            std::cout << plane->planeid() << std::endl;
+            std::cout << "Plane: " << plane->planeid() << std::endl;
         }
     }
 
