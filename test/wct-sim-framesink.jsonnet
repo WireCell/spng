@@ -8,7 +8,15 @@ local io = import 'pgrapher/common/fileio.jsonnet';
 local fileio = import 'layers/high/fileio.jsonnet';
 
 local tools_maker = import 'pgrapher/common/tools.jsonnet';
-local base = import 'pgrapher/experiment/pdhd/simparams.jsonnet';
+
+
+local base = import 'perfect_pdhd/simparams.jsonnet';
+local sim_maker = import 'perfect_pdhd/sim.jsonnet';
+local perfect = import 'perfect_pdhd/chndb-base.jsonnet';
+local nf_maker = import 'perfect_pdhd/nf.jsonnet';
+local sp_maker = import 'perfect_pdhd/sp.jsonnet';
+
+
 local params = base {
   lar: super.lar {
         // Longitudinal diffusion constant
@@ -22,29 +30,21 @@ local params = base {
 
 local tools = tools_maker(params);
 
-local sim_maker = import 'pgrapher/experiment/pdhd/sim.jsonnet';
 local sim = sim_maker(params, tools);
 
 local beam_dir = [-0.178177, -0.196387, 0.959408];
 local beam_center = [-27.173, 421.445, 0];
+local beam_center1 = [27.173, 421.445, 0];
 
 local track0 = {
   head: wc.point(beam_center[0], beam_center[1], beam_center[2], wc.cm),
   tail: wc.point(beam_center[0] + 100*beam_dir[0], beam_center[1] + 100*beam_dir[1], beam_center[2] + 100*beam_dir[2], wc.cm),
-
-  // head: wc.point(-260,300, 50,wc.cm), // apa1
-  // tail: wc.point(-260,300, 200,wc.cm), // apa1 w
-  // tail: wc.point(-260,300 - 0.58364 * 300, 50 + 0.812013 * 300 ,wc.cm), // apa1 u
-  // tail: wc.point(-260,300 + 0.58364 * 300, 50 + 0.812013 * 300 ,wc.cm), // apa1 v
-
-  // head: wc.point(260,300, 50,wc.cm), // apa2
-  // tail: wc.point(260,300, 200,wc.cm), // apa2 w
-  // tail: wc.point(260,300 + 0.58364 * 300, 50 + 0.812013 * 300,wc.cm), // apa2 u
-  // tail: wc.point(260,300 - 0.58364 * 300, 50 + 0.812013 * 300,wc.cm), // apa2 v
-
 };
 
-
+local track1 = {
+  head: wc.point(beam_center1[0], beam_center1[1], beam_center1[2], wc.cm),
+  tail: wc.point(beam_center1[0] + 100*beam_dir[0], beam_center1[1] + 100*beam_dir[1], beam_center1[2] + 100*beam_dir[2], wc.cm),
+};
 local tracklist = [
 
   {
@@ -53,6 +53,11 @@ local tracklist = [
     ray: track0, // params.det.bounds,
   },
 
+  {
+    time: 0 * wc.us,
+    charge: -500, // negative means # electrons per step (see below configuration) 
+    ray: track1, // params.det.bounds,
+  },
 ];
 
 local depos = sim.tracks(tracklist, step=0.1 * wc.mm); // MIP <=> 5000e/mm
@@ -61,15 +66,10 @@ local nanodes = std.length(tools.anodes);
 local anode_iota = std.range(0, nanodes-1);
 local anode_idents = [anode.data.ident for anode in tools.anodes];
 
-local output = 'wct-sim-ideal-sigproc.npz';
-// local deposio = io.numpy.depos(output);
 local drifter = sim.drifter;
 local bagger = sim.make_bagger();
-// signal plus noise pipelines
 local sn_pipes = sim.splusn_pipelines;
-// local analog_pipes = sim.analog_pipelines;
 
-local perfect = import 'pgrapher/experiment/pdhd/chndb-base.jsonnet';
 local chndb = [{
   type: 'OmniChannelNoiseDB',
   name: 'ocndbperfect%d' % n,
@@ -77,7 +77,6 @@ local chndb = [{
   uses: [tools.anodes[n], tools.field, tools.dft],
 } for n in anode_iota];
 
-local nf_maker = import 'pgrapher/experiment/pdhd/nf.jsonnet';
 local nf_pipes = [nf_maker(params, tools.anodes[n], chndb[n], n, name='nf%d' % n) for n in std.range(0, std.length(tools.anodes) - 1)];
 
 local sp_override = {
@@ -88,26 +87,16 @@ local sp_override = {
     process_planes: [0, 1, 2]
 };
 
-// local sp_maker = import 'pgrapher/experiment/pdhd/sp.jsonnet';
-// local sp_maker = import 'newsp.jsonnet';
-local sp_maker = import 'oldsp.jsonnet';
 local sp = sp_maker(params, tools, sp_override);
 local sp_pipes = [sp.make_sigproc(a) for a in tools.anodes];
 
-local magoutput = 'protodunehd-sim-check.root';
-// local magnify = import 'pgrapher/experiment/pdhd/magnify-sinks.jsonnet';
-local magnify = import 'magnify-sinks.jsonnet';
-local magnifyio = magnify(tools, magoutput);
+
+
+
 
 local parallel_pipes = [
   g.pipeline([
                sn_pipes[n],
-               // magnifyio.orig_pipe[n],
-              //  nf_pipes[n],
-              //  magnifyio.raw_pipe[n],
-              //  sp_pipes[n],
-               // magnifyio.debug_pipe[n],
-              //  magnifyio.decon_pipe[n],
              ],
              'parallel_pipe_%d' % n)
   for n in std.range(0, std.length(tools.anodes) - 1)
@@ -116,24 +105,8 @@ local outtags = ['orig%d' % n for n in std.range(0, std.length(tools.anodes) - 1
 local parallel_graph = f.fanpipe('DepoSetFanout', parallel_pipes, 'FrameFanin', 'sn_mag_nf', outtags);
 
 local frame_output = fileio.frame_tensor_file_sink('tensor_frames.npz', mode='tagged');
-// local frame_output = fileio.frame_file_sink('frames.tar', tags=outtags);
 
-// local sio_sink(output, tags=[]) = g.pnode({
-//     type: "FrameFileSink",
-//     name: wc.basename(output),
-//     data: {
-//         outname: output, // "frames.tar.bz2",
-//         tags: tags,
-//         digitize: false,
-//     },
-// }, nin=1, nout=0);
-
-// local sink = sio_sink("frames_test.tar.bz2", ["raw0", 'raw1', 'raw2', 'raw3']);
-
-// local frameio = io.numpy.frames(output, "spframeio", tags='gauss');
-// local sink = sim.frame_sink;
 local graph = g.pipeline([depos, drifter, bagger, parallel_graph, frame_output]);
-// local graph = g.pipeline([depos, drifter, bagger, parallel_graph, frameio]);
 
 
 local app = {

@@ -74,6 +74,7 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
                 //When first accessed with [] it will put in zero.
                 //Using obj++ returns the original obj value before incrementing.
                 m_channel_map[channel->ident()] = m_output_nchannels[out_group]++;
+                std::cout << "[hyu1]chmap: " << channel->ident() << " " << plane->ident() << " " << m_channel_map[channel->ident()] << std::endl;
             }
         }
     }
@@ -116,20 +117,21 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     }
 
 
-    for (auto face : m_anode->faces()) {
-        if (!face) {   // A null face means one sided AnodePlane.
-                    //Throw?
-            continue;  // Can be "back" or "front" face.
-        }
-        for (auto plane : face->planes()) {
-            std::cout << "Plane: " << plane->planeid() << std::endl;
-        }
-    }
+    // for (auto face : m_anode->faces()) {
+    //     if (!face) {   // A null face means one sided AnodePlane.
+    //                 //Throw?
+    //         continue;  // Can be "back" or "front" face.
+    //     }
+    //     for (auto plane : face->planes()) {
+    //         std::cout << "Plane: " << plane->planeid() << std::endl;
+    //     }
+    // }
 
     std::vector<at::TensorAccessor<float,2>> accessors;
     std::vector<torch::Tensor> tensors;
     //Build up tenors + accessors to store input trace values
 
+    //TODO -- Consider turn on/off expecting a static number of ticks?
     for (const auto & [out_group, nchannels] : m_output_nchannels) {
         log->debug("Making tensor of shape: {} {}", nchannels, m_expected_nticks);
         torch::Tensor plane_tensor = torch::zeros({nchannels, m_expected_nticks});

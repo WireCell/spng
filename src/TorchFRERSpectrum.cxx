@@ -232,6 +232,10 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
 
 }
 
+
+// TODO -- Improve redigitization. Brett suggests -- if larger sizes is multiple of other --
+//         integer downsampling in Freq. domain -- chop 1-N/M bits of freq.
+//          Or do LMN resampling technique
 void SPNG::TorchFRERSpectrum::redigitize(
     const std::vector<int64_t> & input_shape
 ) {
