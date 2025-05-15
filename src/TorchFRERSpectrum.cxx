@@ -123,7 +123,7 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
 
         for (int irow = 0; irow < m_fravg_nchans; ++irow) {
             auto& path = plane.paths[irow];
-            for (int icol = 0; icol < m_fravg_nticks; ++icol) {
+            for (int icol = 0; icol < plane.paths[0].current.size(); ++icol) {
 
 
                 if (std::abs(path.current[icol]) > 1.) {

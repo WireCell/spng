@@ -54,8 +54,8 @@ local sp_override = {
     save_negtive_charge: true,
     use_multi_plane_protection: true,
     process_planes: [0, 1, 2],
-    debug_no_frer: true,
-    debug_no_wire_filter: true,
+    debug_no_frer: false,
+    debug_no_wire_filter: false,
 };
 
 local sp = sp_maker(params, tools, sp_override);

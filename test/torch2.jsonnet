@@ -123,9 +123,9 @@ local wc = import 'wirecell.jsonnet';
                     frer_spectrum: wc.tn(torch_frer),
                     wire_filter: wc.tn(the_wire_filter), #put in if statement
                     coarse_time_offset: 1000,
-                    debug_no_frer: true,
-                    debug_no_wire_filter: true,
-                    debug_no_roll: true,
+                    debug_no_frer: false,
+                    debug_no_wire_filter: false,
+                    debug_no_roll: false,
                 },
             },
             nin=1, nout=1,
