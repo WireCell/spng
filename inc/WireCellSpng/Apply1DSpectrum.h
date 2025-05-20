@@ -1,5 +1,5 @@
-#ifndef WIRECELL_SPNGDECON
-#define WIRECELL_SPNGDECON
+#ifndef WIRECELL_SPNGAPPLY1DSPECTRUM
+#define WIRECELL_SPNGAPPLY1DSPECTRUM
 
 #include "WireCellAux/Logger.h"
 
@@ -11,11 +11,11 @@
 
 namespace WireCell {
 namespace SPNG {
-    class Decon : public Aux::Logger,
+    class Apply1DSpectrum : public Aux::Logger,
                     public WireCell::ITorchTensorSetFilter, public WireCell::IConfigurable {
     public:
-        Decon( );
-        virtual ~Decon();
+        Apply1DSpectrum( );
+        virtual ~Apply1DSpectrum();
 
         virtual bool operator()(const input_pointer& in, output_pointer& out);
         virtual void configure(const WireCell::Configuration& config);
@@ -24,14 +24,9 @@ namespace SPNG {
             return cfg;
         };
     private:
-        std::string m_frer_spectrum{"FRERSpectrum"};
-        std::string m_wire_filter{"Torch1DSpectrum"};
-        std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;
-        int m_coarse_time_offset = 0;
-        bool m_debug_no_frer = false;
-        bool m_debug_no_wire_filter = false;
-        bool m_debug_no_roll = false;
-        bool m_debug_force_cpu = false;
+        std::string m_base_spectrum_name{"Torch1DSpectrum"};
+        std::shared_ptr<ITorchSpectrum> m_base_spectrum;
+        int m_dimension{0};
     };
 }
 }

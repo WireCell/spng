@@ -45,6 +45,7 @@ namespace WireCell {
             Response::Schema::FieldResponse m_field_response,
                                             m_field_response_avg;
             
+            bool m_debug_force_cpu = false;
             //Relevant for Field Response
             int m_plane_id = 0;
             bool m_do_average = false;
@@ -61,7 +62,7 @@ namespace WireCell {
             int m_default_nticks = 0;
             int m_default_nchans = 0;
             bool m_do_fft = false;
-
+            
             int m_anode_num = 0;
 
         };

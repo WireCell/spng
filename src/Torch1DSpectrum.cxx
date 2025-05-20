@@ -16,6 +16,7 @@ WireCell::Configuration SPNG::Torch1DSpectrum::default_configuration() const
 {
     Configuration cfg;
     cfg["default_length"] = m_default_length;
+    cfg["debug_force_cpu"] = m_debug_force_cpu;
     return cfg;
 }
 
@@ -23,6 +24,7 @@ void SPNG::Torch1DSpectrum::configure(const WireCell::Configuration& cfg)
 {
 
     m_default_length = get(cfg, "default_length", m_default_length);
+    m_debug_force_cpu = get(cfg, "debug_force_cpu", m_debug_force_cpu);
     m_total_spectrum = torch::ones(m_default_length);
     /*auto accessor = m_total_spectrum.accessor<float,1>();*/
 
@@ -66,7 +68,9 @@ torch::Tensor SPNG::Torch1DSpectrum::spectrum(const std::vector<int64_t> & shape
     //Loop over the spectra
     bool has_cuda = torch::cuda::is_available();
 
-    torch::Device device((has_cuda ? torch::kCUDA : torch::kCPU));
+    torch::Device device((
+        (has_cuda && !m_debug_force_cpu) ? torch::kCUDA : torch::kCPU
+    ));
     for (size_t i = 0; i < m_spectra.size(); ++i) {
         const auto & spectrum = m_spectra[i];
 

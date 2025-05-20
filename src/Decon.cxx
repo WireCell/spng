@@ -74,6 +74,7 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         tensor_clone = tensor_clone / frer_spectrum_tensor;
 
     //Get the Wire filter -- already FFT'd
+    //TODO -- fix the log here because of HfFilter weirdness
     auto wire_filter_tensor = base_wire_filter->spectrum({shape[0]});
 
     //Multiply along the wire dimension

@@ -46,6 +46,8 @@ namespace WireCell {
             //Expected number of ticks in each readout frame
             int m_expected_nticks{-1};
 
+            bool m_debug_force_cpu{false};
+
 
             std::unordered_map<size_t, std::vector<std::pair<size_t,size_t>>> m_channel_ranges;
             //TODO -- possibly add configuration

@@ -51,7 +51,7 @@ function(tools, outputfile) {
       data: {
         output_filename: outputfile,
         root_file_mode: 'UPDATE',
-        frames: ['gauss%d' % n, 'wiener%d' % n, 'decon_init%d' % n],
+        frames: ['gauss%d' % n, 'wiener%d' % n, 'decon_init%d' % n, 'decon_charge%d' % n],
         trace_has_tag: true,
         anode: wc.tn(tools.anodes[n]),
       },

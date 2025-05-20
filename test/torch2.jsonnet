@@ -14,16 +14,39 @@ local wc = import 'wirecell.jsonnet';
 
 // function make_wpid(tools)
 {
-    make_spng :: function(tools) {
+    make_spng :: function(tools, debug_force_cpu=false) {
+
+        local gaus_filter = {
+                type: 'HfFilter',
+                name: 'Gaus_wide',
+                data: {
+                    max_freq: 0.001,  // warning: units
+                    power: 2,
+                    flag: true,
+                    sigma: 0.00012,  // caller should provide
+                    use_negative_freqs: false,
+                }
+        },
+        local torch_gaus_filter = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_gaus",
+                uses: [gaus_filter],
+                data: {
+                    spectra: [
+                        wc.tn(gaus_filter),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
         local wire_filters = [
             {
                 type: 'HfFilter',
                 name: 'Wire_ind',
                 data: {
-                max_freq: 1,  // warning: units
-                power: 2,
-                flag: false,
-                sigma: 1.0 / wc.sqrtpi * 0.75,  // caller should provide
+                    max_freq: 1,  // warning: units
+                    power: 2,
+                    flag: false,
+                    sigma: 1.0 / wc.sqrtpi * 0.75,  // caller should provide
                 }
             },
             {
@@ -44,9 +67,11 @@ local wc = import 'wirecell.jsonnet';
                 name: "torch_1dspec_ind",
                 uses: [wire_filters[0]],
                 data: {
-                spectra: [
-                    wc.tn(wire_filters[0]),
-                ]
+                    spectra: [
+                        wc.tn(wire_filters[0]),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+
                 },
             },
             {
@@ -54,9 +79,11 @@ local wc = import 'wirecell.jsonnet';
                 name: "torch_1dspec_col",
                 uses: [wire_filters[1]],
                 data: {
-                spectra: [
-                    wc.tn(wire_filters[1]),
-                ]
+                    spectra: [
+                        wc.tn(wire_filters[1]),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+
                 },
             },
         ],
@@ -82,6 +109,8 @@ local wc = import 'wirecell.jsonnet';
                         
                         [wc.WirePlaneId(wc.Wlayer, 1, anode.data.ident)],
                     ],
+                    debug_force_cpu: debug_force_cpu,
+
 
                 }
             }, nin=1, nout=4, uses=[anode]),
@@ -111,6 +140,8 @@ local wc = import 'wirecell.jsonnet';
                     default_period: 500.0, #512.0,
                     extra_scale: 1.0,
                     anode_num: anode.data.ident,
+                    debug_force_cpu: debug_force_cpu,
+
                 }
             },
 
@@ -126,10 +157,23 @@ local wc = import 'wirecell.jsonnet';
                     debug_no_frer: false,
                     debug_no_wire_filter: false,
                     debug_no_roll: false,
+                    debug_force_cpu: debug_force_cpu,
                 },
             },
             nin=1, nout=1,
             uses=[torch_frer, the_wire_filter]),
+
+
+            local spng_gaus_app = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_gaus_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(torch_gaus_filter), #put in if statement
+                    dimension: 1,
+                },
+            },
+            nin=1, nout=1,
+            uses=[torch_gaus_filter]),
 
             local torch_to_tensor = g.pnode({
                 type: 'TorchToTensor',
@@ -149,6 +193,7 @@ local wc = import 'wirecell.jsonnet';
             ret : g.pipeline(
                 [
                     spng_decon,
+                    spng_gaus_app,
                     torch_to_tensor,
                     tensor_sink,
                 ]

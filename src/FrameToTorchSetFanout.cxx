@@ -19,6 +19,7 @@ WireCell::Configuration SPNG::FrameToTorchSetFanout::default_configuration() con
 {
     Configuration cfg;
     cfg["anode"] = m_anode_tn;
+    cfg["debug_force_cpu"] = m_debug_force_cpu;
     return cfg;
 }
 
@@ -27,6 +28,8 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
     //Get the anode to make a channel map for output
     m_anode_tn = get(config, "anode", m_anode_tn);
     m_anode = Factory::find_tn<IAnodePlane>(m_anode_tn);
+
+    m_debug_force_cpu = get(config, "debug_force_cpu", m_debug_force_cpu);
 
 
     m_expected_nticks = get(config, "expected_nticks", m_expected_nticks);
@@ -165,7 +168,9 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     }
     bool has_cuda = torch::cuda::is_available();
 
-    torch::Device device((has_cuda ? torch::kCUDA : torch::kCPU));
+    torch::Device device((
+        (has_cuda && !m_debug_force_cpu) ? torch::kCUDA : torch::kCPU
+    ));
     //Build up Tensors according to the output groups
     for (const auto & [output_index, nchannels] : m_output_nchannels) {
         

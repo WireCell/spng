@@ -117,7 +117,7 @@ local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fano
 
 
 local tf_maker = import 'torch2.jsonnet';
-local spng_decons = tf_maker.make_spng(tools);
+local spng_decons = tf_maker.make_spng(tools, false);
 
 
 local load_to_fanout = g.intern(

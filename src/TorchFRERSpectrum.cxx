@@ -25,6 +25,7 @@ WireCell::Configuration SPNG::TorchFRERSpectrum::default_configuration() const
     // cfg["do_fft"] = m_do_fft;
     cfg["default_nticks"] = m_default_nticks;
     cfg["default_period"] = m_default_period;
+    cfg["debug_force_cpu"] = m_debug_force_cpu;
     cfg["default_nchans"] = m_default_nchans;
     // cfg["tick_period"] = m_tick_period;
     // cfg["shaping"] = m_shaping;
@@ -50,6 +51,8 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     m_default_nticks = get(cfg, "default_nticks", m_default_nticks);
     m_default_nchans = get(cfg, "default_nchans", m_default_nchans);
     m_default_period = get(cfg, "default_period", m_default_period);
+
+    m_debug_force_cpu = get(cfg, "debug_force_cpu", m_debug_force_cpu);
 
     m_inter_gain = get(cfg, "inter_gain", m_inter_gain);
     m_ADC_mV = get(cfg, "ADC_mV", m_ADC_mV);
@@ -275,8 +278,10 @@ void SPNG::TorchFRERSpectrum::redigitize(
         }
     }
     bool has_cuda = torch::cuda::is_available();
-    torch::Device device((has_cuda ? torch::kCUDA : torch::kCPU));
-    // the_tensor.to(device);
+    torch::Device device((
+        (has_cuda && !m_debug_force_cpu) ? 
+        torch::kCUDA : 
+        torch::kCPU));
     m_cache.insert(input_shape, the_tensor.to(device));
 }
 
