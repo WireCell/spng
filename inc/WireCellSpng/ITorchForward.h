@@ -1,18 +1,18 @@
 /** An interface to a "forward" operator on a tensor set */
 
-#ifndef WIRECELL_ITENSORFORWARD
-#define WIRECELL_ITENSORFORWARD
+#ifndef WIRECELL_ITorchFORWARD
+#define WIRECELL_ITorchFORWARD
 
 #include "WireCellUtil/IComponent.h"
-#include "WireCellIface/ITensorSet.h"
+#include "WireCellIface/ITorchSet.h"
 
 namespace WireCell {
-    class ITensorForward : public IComponent<ITensorForward> {
+    class ITorchForward : public IComponent<ITorchForward> {
       public:
-        virtual ~ITensorForward();
+        virtual ~ITorchForward();
 
-        virtual ITensorSet::pointer forward(const ITensorSet::pointer& input) const = 0;
+        virtual ITorchSet::pointer forward(const ITorchSet::pointer& input) const = 0;
     };
 }  // namespace WireCell
 
-#endif  // WIRECELL_ITENSORFORWARD
+#endif  // WIRECELL_ITorchFORWARD
