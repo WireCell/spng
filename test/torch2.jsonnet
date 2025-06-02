@@ -126,6 +126,39 @@ local wc = import 'wirecell.jsonnet';
             type: "HfFilter"
         },
 
+        local torch_roi_tight = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_roi_tight",
+                uses: [ROI_tight_lf],
+                data: {
+                    spectra: [
+                        wc.tn(ROI_tight_lf),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
+        local torch_roi_tighter = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_roi_tighter",
+                uses: [ROI_tighter_lf],
+                data: {
+                    spectra: [
+                        wc.tn(ROI_tighter_lf),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
+        local torch_roi_loose = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_roi_loose",
+                uses: [ROI_loose_lf],
+                data: {
+                    spectra: [
+                        wc.tn(ROI_loose_lf),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
 
         local torch_wiener_tight_only_u = {
                 type: "Torch1DSpectrum",
