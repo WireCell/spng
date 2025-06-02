@@ -16,6 +16,151 @@ local wc = import 'wirecell.jsonnet';
 {
     make_spng :: function(tools, debug_force_cpu=false) {
 
+        local ROI_loose_lf = {
+            data: {
+                max_freq: 0.001,
+                tau: 2.0e-06,
+                use_negative_freqs: false,
+            },
+            name: "ROI_loose_lf",
+            type: "LfFilter"
+        },
+
+        local ROI_tight_lf = {
+            data: {
+                max_freq: 0.001,
+                tau: 1.6e-05,
+                use_negative_freqs: false,
+            },
+            name: "ROI_tight_lf",
+            type: "LfFilter"
+        },
+        local ROI_tighter_lf = {
+            data: {
+                max_freq: 0.001,
+                tau: 8.0e-050,
+                use_negative_freqs: false,
+            },
+            name: "ROI_tighter_lf",
+            type: "LfFilter"
+        },
+        local gaus_tight = {
+            data: {
+                "flag": true,
+                max_freq: 0.001,
+                power: 2,
+                sigma: 0,
+                use_negative_freqs: false,
+
+            },
+            name: "Gaus_tight",
+            type: "HfFilter"
+        },
+        local wiener_tight_u = {
+            data: {
+                flag: true,
+                max_freq: 0.001,
+                power: 6.55413,
+                sigma: 0.000221933,
+                use_negative_freqs: false,
+            },
+            name: "Wiener_tight_U",
+            type: "HfFilter"
+        },
+        local wiener_tight_v = {
+            data: {
+                flag: true,
+                max_freq: 0.001,
+                power: 8.75998,
+                sigma: 0.000222723,
+                use_negative_freqs: false,
+            },
+            name: "Wiener_tight_V",
+            type: "HfFilter"
+        },
+
+        local wiener_tight_w = {
+            data: {
+                flag: true,
+                max_freq: 0.001,
+                power: 3.47846,
+                sigma: 0.000225567,
+                use_negative_freqs: false,
+            },
+            name: "Wiener_tight_W",
+            type: "HfFilter"
+        },
+
+        local wiener_wide_u = {
+            data: {
+                flag: true,
+                max_freq: 0.001,
+                power: 5.05429,
+                sigma: 0.000186765,
+                use_negative_freqs: false,
+            },
+            name: "Wiener_wide_U",
+            type: "HfFilter"
+        },
+
+        local wiener_wide_v = {
+            data: {
+                flag: true,
+                max_freq: 0.001,
+                power: 5.77422,
+                sigma: 0.0001936,
+                use_negative_freqs: false,
+            },
+            name: "Wiener_wide_V",
+            type: "HfFilter"
+        },
+        local wiener_wide_w = {
+            data: {
+                flag: true,
+                max_freq: 0.001,
+                power: 4.37928,
+                sigma: 0.000175722,
+                use_negative_freqs: false,
+            },
+            name: "Wiener_wide_W",
+            type: "HfFilter"
+        },
+
+
+        local torch_wiener_tight_only_u = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_wiener_tight_only_u",
+                uses: [wiener_tight_u],
+                data: {
+                    spectra: [
+                        wc.tn(wiener_tight_u),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
+        local torch_wiener_tight_only_v = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_wiener_tight_only_v",
+                uses: [wiener_tight_v],
+                data: {
+                    spectra: [
+                        wc.tn(wiener_tight_v),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
+        local torch_wiener_tight_only_w = {
+                type: "Torch1DSpectrum",
+                name: "torch_1dspec_wiener_tight_only_w",
+                uses: [wiener_tight_w],
+                data: {
+                    spectra: [
+                        wc.tn(wiener_tight_w),
+                    ],
+                    debug_force_cpu: debug_force_cpu,
+                },
+        },
+
         local gaus_filter = {
                 type: 'HfFilter',
                 name: 'Gaus_wide',
@@ -53,10 +198,10 @@ local wc = import 'wirecell.jsonnet';
                 type: 'HfFilter',
                 name: 'Wire_col',
                 data: {
-                max_freq: 1,  // warning: units
-                power: 2,
-                flag: false,
-                sigma: 1.0 / wc.sqrtpi * 10.0,  // caller should provide
+                    max_freq: 1,  // warning: units
+                    power: 2,
+                    flag: false,
+                    sigma: 1.0 / wc.sqrtpi * 10.0,  // caller should provide
                 }
             },
         ],
