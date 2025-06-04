@@ -1,5 +1,5 @@
-#ifndef WIRECELL_SPNGAPPLY1DSPECTRUM
-#define WIRECELL_SPNGAPPLY1DSPECTRUM
+#ifndef WIRECELL_SPNGTORCHTENSORSETTAGGER
+#define WIRECELL_SPNGTORCHTENSORSETTAGGER
 
 #include "WireCellAux/Logger.h"
 
@@ -11,11 +11,11 @@
 
 namespace WireCell {
 namespace SPNG {
-    class Apply1DSpectrum : public Aux::Logger,
+    class TorchTensorSetTagger : public Aux::Logger,
                     public WireCell::ITorchTensorSetFilter, public WireCell::IConfigurable {
     public:
-        Apply1DSpectrum( );
-        virtual ~Apply1DSpectrum();
+        TorchTensorSetTagger( );
+        virtual ~TorchTensorSetTagger();
 
         virtual bool operator()(const input_pointer& in, output_pointer& out);
         virtual void configure(const WireCell::Configuration& config);
@@ -24,12 +24,10 @@ namespace SPNG {
             return cfg;
         };
     private:
-        std::string m_base_spectrum_name{"Torch1DSpectrum"};
-        std::shared_ptr<ITorchSpectrum> m_base_spectrum;
-        int m_dimension{0};
-        Json::Value m_target_tensor{"Default"},
-                    m_output_set_tag,
-                    m_output_tensor_tag{"Default"};
+        //Normally, this node will crash if there already is a tag in the metadata
+        bool m_allow_retagging{false};
+
+        std::map<std::string, std::string> m_tag_list;
     };
 }
 }

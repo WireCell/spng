@@ -117,7 +117,7 @@ local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fano
 
 
 local tf_maker = import 'torch2.jsonnet';
-local spng_decons = tf_maker.make_spng(tools, false);
+local spng_decons = tf_maker.make_spng(tools, false, (std.extVar("ROI") == 1));
 
 
 local load_to_fanout = g.intern(
@@ -143,7 +143,6 @@ local graph = if std.extVar("SPNG") == 0 then
       g.edge(load_to_fanout, spng_decons[2], 2),
       g.edge(load_to_fanout, spng_decons[3], 3),
     ]
-
   );
 
 local app = {

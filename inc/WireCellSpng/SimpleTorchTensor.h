@@ -12,7 +12,7 @@ class SimpleTorchTensor: public ITorchTensor {
       }
 
     virtual torch::Tensor tensor() const { return m_tensor.detach().clone(); }
-    virtual const Configuration& metadata() const { return m_md; }
+    virtual Configuration metadata() const { return m_md; }
     virtual std::string dtype() const { return torch::toString(m_tensor.dtype()); }
     virtual std::vector<int64_t> shape() const { return m_tensor.sizes().vec(); }
     virtual torch::Device device() const { return m_tensor.device(); }

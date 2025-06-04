@@ -32,6 +32,11 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
     m_debug_no_frer = get(config, "debug_no_frer", m_debug_no_frer);
     m_debug_no_wire_filter = get(config, "debug_no_wire_filter", m_debug_no_wire_filter);
     m_debug_no_roll = get(config, "debug_no_roll", m_debug_no_roll);
+
+    m_output_set_tag = get(config, "output_set_tag", m_output_set_tag);
+    m_output_tensor_tag = get(config, "output_tensor_tag", m_output_tensor_tag);
+    log->debug("Will tag with Set:{} Tensor:{}", m_output_set_tag.asString(),
+               m_output_tensor_tag.asString());
 }
 
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {
@@ -96,18 +101,21 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         tensor_clone = tensor_clone.roll(time_shift, 1);
     }
 
-    // TODO: set md
-    Configuration set_md;
+    Configuration set_md, tensor_md;
 
-    //Clone the tensor to take ownership of the memory and put into 
-    //output 
+    tensor_md["tag"] = m_output_tensor_tag;
+    set_md["tag"] = m_output_set_tag;
+    auto output_tensor = std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md);
     std::vector<ITorchTensor::pointer> itv{
-        std::make_shared<SimpleTorchTensor>(tensor_clone)
+        output_tensor
     };
     out = std::make_shared<SimpleTorchTensorSet>(
         in->ident(), set_md,
         std::make_shared<std::vector<ITorchTensor::pointer>>(itv)
     );
+    log->debug("Tagged output with Set:{} Tensor:{}",
+               out->metadata()["tag"],
+               out->tensors()->at(0)->metadata()["tag"]);
 
     return true;
 }

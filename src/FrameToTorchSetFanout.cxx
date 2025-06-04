@@ -77,7 +77,7 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
                 //When first accessed with [] it will put in zero.
                 //Using obj++ returns the original obj value before incrementing.
                 m_channel_map[channel->ident()] = m_output_nchannels[out_group]++;
-                std::cout << "[hyu1]chmap: " << channel->ident() << " " << plane->ident() << " " << m_channel_map[channel->ident()] << std::endl;
+                // std::cout << "[hyu1]chmap: " << channel->ident() << " " << plane->ident() << " " << m_channel_map[channel->ident()] << std::endl;
             }
         }
     }

@@ -25,6 +25,28 @@ void WireCell::SPNG::Apply1DSpectrum::configure(const WireCell::Configuration& c
 
     m_dimension = get(config, "dimension", m_dimension);
     log->debug("Will apply to dimension {}", m_dimension);
+
+    m_target_tensor = get(config, "target_tensor", m_target_tensor);
+
+    // if (!config.isMember("target_tensor")) {
+    //     THROW(ValueError()
+    //         << errmsg{"Must provide target_tensor in Apply1DSpectrum configuration"});
+    // }
+    // m_target_tensor = config["target_tensor"];
+    log->debug("Will apply to target_tensor {}", m_target_tensor.asString());
+
+    // if (!config.isMember("output_tensor_tag")) {
+    //     THROW(ValueError()
+    //         << errmsg{"Must provide output_tensor_tag in Apply1DSpectrum configuration"});
+    // }
+    // m_output_tensor_tag = config["output_tensor_tag"];
+    m_output_tensor_tag = get(config, "output_tensor_tag", m_output_tensor_tag);
+
+    if (!config.isMember("output_set_tag")) {
+        THROW(ValueError()
+            << errmsg{"Must provide output_set_tag in Apply1DSpectrum configuration"});
+    }
+    m_output_set_tag = config["output_set_tag"];
 }
 
 bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output_pointer& out) {
@@ -36,7 +58,21 @@ bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output
     log->debug("Running Apply1DSpectrum");
 
     //Get the cloned tensor from the input
-    auto tensor_clone = in->tensors()->at(0)->tensor().clone();
+    bool found = false;
+    auto tensor_clone = torch::empty(0);
+    for (auto torch_tensor : *(in->tensors())) {
+        auto md = torch_tensor->metadata();
+        if (md.isMember("tag") && (md["tag"] == m_target_tensor)) {
+            tensor_clone = torch_tensor->tensor().clone();
+            found = true;
+        }
+    }
+    if (!found) {
+        THROW(ValueError()
+            << errmsg{"Could not find tag " + m_target_tensor.asString() + " within input"});
+    }
+
+    // auto tensor_clone = in->tensors()->at(0)->tensor().clone();
     auto sizes = tensor_clone.sizes();
     std::vector<int64_t> shape;
     for (const auto & s : sizes) {
@@ -75,13 +111,13 @@ bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output
     tensor_clone = torch::fft::irfft(tensor_clone, std::nullopt, m_dimension);
     log->debug("Done");
 
-    // TODO: set md
-    Configuration set_md;
+    // TODO: set md?
+    Configuration set_md, tensor_md;
+    set_md["tag"] = m_output_set_tag;
+    tensor_md["tag"] = m_output_tensor_tag;
 
-    //Clone the tensor to take ownership of the memory and put into 
-    //output 
     std::vector<ITorchTensor::pointer> itv{
-        std::make_shared<SimpleTorchTensor>(tensor_clone)
+        std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md)
     };
     out = std::make_shared<SimpleTorchTensorSet>(
         in->ident(), set_md,
