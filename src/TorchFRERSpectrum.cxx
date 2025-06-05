@@ -129,13 +129,13 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
             for (int icol = 0; icol < plane.paths[0].current.size(); ++icol) {
 
 
-                if (std::abs(path.current[icol]) > 1.) {
-                    log->warn(String::format("Setting large value %f to 0.", path.current[icol]));
-                    accessor[irow][icol] = 0.;
-                }
-                else {
+                // if (std::abs(path.current[icol]) > 1.) {
+                //     log->warn(String::format("Setting large value %f to 0.", path.current[icol]));
+                //     accessor[irow][icol] = 0.;
+                // }
+                // else {
                     accessor[irow][icol] = path.current[icol];
-                }
+                // }
 
                 arr_alt(irow, icol) = path.current[icol];
             }
@@ -259,6 +259,7 @@ void SPNG::TorchFRERSpectrum::redigitize(
     auto result_accessor = the_tensor.accessor<float,2>();
     auto total_response_accessor = m_total_response.accessor<float,2>();
     for (int irow = 0; irow < m_fravg_nchans; ++irow) {
+        std::cout << "Redigitizing " << irow << std::endl;
         int fcount = 1;
         for (int i = 0; i < nticks; i++) {
             float ctime = m_default_period*i;
@@ -268,7 +269,9 @@ void SPNG::TorchFRERSpectrum::redigitize(
                     fcount++;
                     if (fcount >= m_fravg_nticks) break;
                 }
+            }
 
+            if (fcount < m_fravg_nticks) {
                 result_accessor[irow][i] = (
                     (ctime - m_fravg_period*(fcount - 1)) / m_fravg_period * total_response_accessor[irow][fcount - 1] +
                     (m_fravg_period*fcount - ctime) / m_fravg_period * total_response_accessor[irow][fcount]
