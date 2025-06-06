@@ -1,4 +1,4 @@
-/** An interface to a "forward" operator on a tensor set */
+/** An interface to a "forward" operator on a Torch set */
 
 #ifndef WIRECELL_ITorchFORWARD
 #define WIRECELL_ITorchFORWARD
@@ -6,7 +6,7 @@
 #include "WireCellUtil/IComponent.h"
 #include "WireCellIface/ITorchSet.h"
 
-namespace WireCell {
+namespace WireCell::SPNG{
     class ITorchForward : public IComponent<ITorchForward> {
       public:
         virtual ~ITorchForward();
