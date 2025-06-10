@@ -43,14 +43,8 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
     }
     log->debug("Running ROITests");
     
-
-    //TODO -- Loop over input tensors
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
-
-    //TODO -- Check the tensor tags
-    //     -- Look at the 'tag' within the metadata
     auto sizes = tensor_clone.sizes();
-    //log->debug("Tensor sizes: {}", sizes);
-    
+    std::cout<<"ROITests: tensor_clone sizes: "<<sizes<<std::endl;
     return true;
 }
