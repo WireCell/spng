@@ -137,7 +137,7 @@ local graph = if std.extVar("SPNG") == 0 then
     innodes=[load_to_fanout],
     outnodes=spng_decons,
     centernodes=[],
-    edges = [
+    edges = [ 
       g.edge(load_to_fanout, spng_decons[0], 0),
       g.edge(load_to_fanout, spng_decons[1], 1),
       g.edge(load_to_fanout, spng_decons[2], 2),

@@ -130,13 +130,18 @@ local wc = import 'wirecell.jsonnet';
             },
             nin=1, nout=1,
             uses=[torch_frer, the_wire_filter]),
-
+            local spng_roi = g.pnode({
+                type: 'SPNGROITests',
+                name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
+                data:{ },
+            }, nin=1, nout=1
+            ),
             local torch_to_tensor = g.pnode({
                 type: 'TorchToTensor',
                 name: 'torchtotensor_%d_%d' % [anode.data.ident, iplane],
                 data: {},
-            }, nin=1, nout=1),
-
+            }, nin=1, nout=1
+            ),
             local tensor_sink = g.pnode({
                 type: 'TensorFileSink',
                 name: 'tfsink_%d_%d' % [anode.data.ident, iplane],
@@ -149,6 +154,7 @@ local wc = import 'wirecell.jsonnet';
             ret : g.pipeline(
                 [
                     spng_decon,
+                    spng_roi,
                     torch_to_tensor,
                     tensor_sink,
                 ]
