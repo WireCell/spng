@@ -1,17 +1,17 @@
 /** Apply a torch script module to "forward" an input tensor. */
 
-#ifndef WIRECELLPYTORCH_TORCHSERVICE
-#define WIRECELLPYTORCH_TORCHSERVICE
+#ifndef WIRECELL_SPNG_TORCHSERVICE
+#define WIRECELL_SPNG_TORCHSERVICE
 
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellIface/ITensorForward.h"
 #include "WireCellUtil/Logging.h"
 #include "WireCellAux/Logger.h"
-#include "WireCellPytorch/TorchContext.h"
+#include "WireCellSpng/TorchContext.h"
 
-#include "WireCellPytorch/Torch.h"  // One-stop header.
+#include "WireCellSpng/Torch.h"  // One-stop header.
 
-namespace WireCell::Pytorch {
+namespace WireCell::SPNG {
     class TorchService : public Aux::Logger,
                          public ITensorForward,
                          public IConfigurable
@@ -39,6 +39,6 @@ namespace WireCell::Pytorch {
         TorchContext m_ctx;
 
     };
-}  // namespace WireCell::Pytorch
+}  // namespace WireCell::SPNG
 
-#endif  // WIRECELLPYTORCH_TORCHSERVICE
+#endif  // WIRECELLSPNG_TORCHSERVICE
