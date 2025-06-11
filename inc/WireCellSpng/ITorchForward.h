@@ -4,7 +4,7 @@
 #define WIRECELL_ITorchFORWARD
 
 #include "WireCellUtil/IComponent.h"
-#include "WireCellIface/ITorchSet.h"
+#include "WireCellSpng/ITorchSet.h"
 
 namespace WireCell::SPNG{
     class ITorchForward : public IComponent<ITorchForward> {
