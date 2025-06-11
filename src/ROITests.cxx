@@ -25,7 +25,8 @@ ROITests::~ROITests()
 
 void ROITests::configure(const WireCell::Configuration& cfg)
 {
-    //configuration parameters required to run this code.
+   m_cfg.anode = get(cfg, "anode",m_cfg.anode);
+   m_cfg.plane = get(cfg, "plane", m_cfg.plane);
 }
 
 void ROITests::finalize()
@@ -44,6 +45,8 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
     
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
     auto sizes = tensor_clone.sizes();
-    std::cout<<"ROITests: tensor_clone sizes: "<<sizes<<std::endl;
+    //log->debug("Tensor sizes: {}", sizes);
+
+
     return true;
 }

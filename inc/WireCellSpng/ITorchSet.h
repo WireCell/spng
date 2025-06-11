@@ -1,7 +1,7 @@
 #ifndef WIRECELL_ITorchSET
 #define WIRECELL_ITorchSET
 
-#include "WireCellIface/ITorch.h"
+#include "WireCellSpng/ITorch.h"
 #include "WireCellUtil/Configuration.h"
 
 
