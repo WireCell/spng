@@ -14,7 +14,7 @@ local wc = import 'wirecell.jsonnet';
 
 // function make_wpid(tools)
 {
-    make_spng :: function(tools, debug_force_cpu=false, do_roi_filters=false) {
+    make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false) {
 
         local ROI_loose_lf = {
             data: {
@@ -339,7 +339,7 @@ local wc = import 'wirecell.jsonnet';
                 data: {multiplicity: (if iplane > 1 then 2 else 5)}
             }, nin=1, nout=(if iplane > 1 then 2 else 5), uses=[anode])
         }.ret,
-        local make_pipeline(anode, iplane, do_roi_filters=false) = {
+        local make_pipeline(anode, iplane, apply_gaus=true, do_roi_filters=false) = {
             local the_field = if std.length(tools.fields) > 1 then tools.fields[anode.data.ident] else tools.fields[0],
             local torch_frer = {
                 type: "TorchFRERSpectrum",
@@ -532,7 +532,7 @@ local wc = import 'wirecell.jsonnet';
             }, nin=1, nout=0),
 
 
-            local decon_and_gaus = [spng_decon, spng_gaus_app],
+            local decon_and_gaus = [spng_decon] + (if apply_gaus then [spng_gaus_app] else []),
             local convert_and_sink = [torch_to_tensor, tensor_sink],
 
             local post_gaus_replicator = make_replicator_post_gaus(anode, iplane),
@@ -662,14 +662,14 @@ local wc = import 'wirecell.jsonnet';
 
         // local tf_fans = [make_fanout(a) for a in tools.anodes],
         
-        local spng_fanout(anode, do_roi_filters=false) = {
+        local spng_fanout(anode, apply_gaus=true, do_roi_filters=false) = {
 
             #FrameToTorchSetFanout
             local tf_fan = make_fanout(anode),
 
             #SPNGDecon + Output stuff -- per plane
             local pipelines = [
-                make_pipeline(anode, iplane, do_roi_filters)
+                make_pipeline(anode, iplane, apply_gaus, do_roi_filters)
                 for iplane in std.range(0, 3)
             ],
 
@@ -686,7 +686,7 @@ local wc = import 'wirecell.jsonnet';
         }.ret,
         
         ret : [
-            spng_fanout(anode, do_roi_filters) for anode in tools.anodes
+            spng_fanout(anode, apply_gaus=apply_gaus, do_roi_filters=do_roi_filters) for anode in tools.anodes
         ],
     }.ret,
 

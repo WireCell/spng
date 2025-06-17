@@ -117,7 +117,12 @@ local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fano
 
 
 local tf_maker = import 'torch2.jsonnet';
-local spng_decons = tf_maker.make_spng(tools, false, (std.extVar("ROI") == 1));
+local spng_decons = tf_maker.make_spng(
+  tools,
+  debug_force_cpu=false,
+  apply_gaus=(std.extVar("ApplyGaus") == 1),
+  do_roi_filters=(std.extVar("ROI") == 1)
+);
 
 
 local load_to_fanout = g.intern(
