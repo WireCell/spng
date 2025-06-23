@@ -118,9 +118,9 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
 
         m_shape = {m_fravg_nchans, m_fravg_nticks};
 
-        m_total_response = torch::zeros(m_shape);
+        m_total_response = torch::zeros(m_shape, torch::TensorOptions().dtype(torch::kFloat64));
         log->debug("Got {} {}", m_fravg_nchans, m_fravg_nticks);
-        auto accessor = m_total_response.accessor<float,2>();
+        auto accessor = m_total_response.accessor<double,2>();
         
         Array::array_xxf arr_alt = Array::array_xxf::Zero(m_fravg_nchans, m_fravg_nticks);
 
@@ -180,10 +180,10 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
 
 
     m_elec_response = Factory::find_tn<IWaveform>(m_elec_response_name);
-    torch::Tensor elec_response_tensor = torch::zeros(m_fravg_nticks);
+    torch::Tensor elec_response_tensor = torch::zeros(m_fravg_nticks, torch::TensorOptions().dtype(torch::kFloat64));
     WireCell::Binning tbins(m_fravg_nticks, 0, m_fravg_nticks*m_fravg_period);
     auto ewave = m_elec_response->waveform_samples(tbins);
-    auto accessor = elec_response_tensor.accessor<float,1>();
+    auto accessor = elec_response_tensor.accessor<double,1>();
     for (int i = 0; i < m_fravg_nticks; ++i) {
         accessor[i] = ewave[i]/* * m_inter_gain * m_ADC_mV * (-1)*/;
     }
@@ -221,7 +221,7 @@ void SPNG::TorchFRERSpectrum::configure(const WireCell::Configuration& cfg)
     const std::string fname = "test_output_frer.npz";
     Array::array_xxf arr = Array::array_xxf::Zero(default_shape[0], default_shape[1]);
     auto output = m_cache.get(default_shape).value().to(torch::kCPU);
-    auto output_accessor = output.accessor<float,2>();
+    auto output_accessor = output.accessor<double,2>();
     for (int irow = 0; irow < default_shape[0]; ++irow) {
         for (int icol = 0; icol < default_shape[1]; ++icol) {
             arr(irow, icol) = output_accessor[irow][icol];
@@ -253,19 +253,21 @@ void SPNG::TorchFRERSpectrum::redigitize(
         return;
     }
 
-    auto the_tensor = torch::zeros(input_shape);
+    auto the_tensor = torch::zeros(input_shape, torch::TensorOptions().dtype(torch::kFloat64));
     //If not, we need to create a new version
     // auto result_accessor = m_cache.get(input_shape).value().accessor<float,2>();
-    auto result_accessor = the_tensor.accessor<float,2>();
-    auto total_response_accessor = m_total_response.accessor<float,2>();
+    auto result_accessor = the_tensor.accessor<double,2>();
+    auto total_response_accessor = m_total_response.accessor<double,2>();
     for (int irow = 0; irow < m_fravg_nchans; ++irow) {
         std::cout << "Redigitizing " << irow << std::endl;
         int fcount = 1;
         for (int i = 0; i < nticks; i++) {
-            float ctime = m_default_period*i;
-            // std::cout << "ctime " << ctime << " " << m_default_period << i << std::endl;
+            double ctime = m_default_period*i;
+            if (irow == 0) 
+                    std::cout << i << " Ctime: " << ctime << std::endl;
             if (fcount < m_fravg_nticks) {
                 while (ctime > fcount*m_fravg_period) {
+                    if (irow == 0) std::cout << "\tftime: " << fcount*m_fravg_period << std::endl;
                     fcount++;
                     if (fcount >= m_fravg_nticks) break;
                 }
@@ -276,6 +278,12 @@ void SPNG::TorchFRERSpectrum::redigitize(
                     (ctime - m_fravg_period*(fcount - 1)) / m_fravg_period * total_response_accessor[irow][fcount - 1] +
                     (m_fravg_period*fcount - ctime) / m_fravg_period * total_response_accessor[irow][fcount]
                 );
+                if (irow == 0) {
+                    std::cout << "\t" << ctime << " " << fcount << " " << std::setprecision(10) << m_fravg_period*(fcount - 1) << " " << std::setprecision(10) << m_fravg_period*fcount << std::endl;
+                    std::cout << "\tdiff: " << (ctime - m_fravg_period*(fcount - 1)) << " " << (m_fravg_period*fcount - ctime) << std::endl;
+                    std::cout << "\t" << m_fravg_period << " " << total_response_accessor[irow][fcount - 1] << " " << total_response_accessor[irow][fcount] << std::endl;
+                    std::cout << "\t" << result_accessor[irow][i] << std::endl;
+                }
             }
 
         }
@@ -303,7 +311,7 @@ torch::Tensor SPNG::TorchFRERSpectrum::spectrum(const std::vector<int64_t> & sha
     const std::string fname = "test_output_frer.npz";
     Array::array_xxf arr = Array::array_xxf::Zero(shape[0], shape[1]);
     auto output = m_cache.get(shape).value().to(torch::kCPU);
-    auto output_accessor = output.accessor<float,2>();
+    auto output_accessor = output.accessor<double,2>();
     for (int irow = 0; irow < shape[0]; ++irow) {
         for (int icol = 0; icol < shape[1]; ++icol) {
             arr(irow, icol) = output_accessor[irow][icol];

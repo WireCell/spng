@@ -121,7 +121,8 @@ local spng_decons = tf_maker.make_spng(
   tools,
   debug_force_cpu=false,
   apply_gaus=(std.extVar("ApplyGaus") == 1),
-  do_roi_filters=(std.extVar("ROI") == 1)
+  do_roi_filters=(std.extVar("ROI") == 1),
+  do_collate_apa=(std.extVar("CollateAPAs") == 1),
 );
 
 

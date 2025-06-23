@@ -130,16 +130,16 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     //     }
     // }
 
-    std::vector<at::TensorAccessor<float,2>> accessors;
+    std::vector<at::TensorAccessor<double,2>> accessors;
     std::vector<torch::Tensor> tensors;
     //Build up tenors + accessors to store input trace values
 
     //TODO -- Consider turn on/off expecting a static number of ticks?
     for (const auto & [out_group, nchannels] : m_output_nchannels) {
         log->debug("Making tensor of shape: {} {}", nchannels, m_expected_nticks);
-        torch::Tensor plane_tensor = torch::zeros({nchannels, m_expected_nticks});
+        torch::Tensor plane_tensor = torch::zeros({nchannels, m_expected_nticks}, torch::TensorOptions().dtype(torch::kFloat64));
         tensors.push_back(plane_tensor);
-        accessors.push_back(tensors.back().accessor<float,2>());
+        accessors.push_back(tensors.back().accessor<double,2>());
     }
 
     

@@ -28,6 +28,7 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
     base_wire_filter = Factory::find_tn<ITorchSpectrum>(m_wire_filter);
 
     m_coarse_time_offset = get(config, "coarse_time_offset", m_coarse_time_offset);
+    m_pad_wire_domain = get(config, "pad_wire_domain", m_pad_wire_domain);
 
     m_debug_no_frer = get(config, "debug_no_frer", m_debug_no_frer);
     m_debug_no_wire_filter = get(config, "debug_no_wire_filter", m_debug_no_wire_filter);
@@ -59,6 +60,28 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     
     // TODO -- Padding in time domain then trim
     //      -- Later down the line overlap/add for extended readout
+    //Always Pad in time because of non-periodicity in this domain
+
+    if (m_pad_wire_domain) {
+        // auto input_length = shape[0];
+        auto response_length = base_frer_spectrum->shape()[0];
+
+        //Pad to M+N-1 size 
+        tensor_clone = torch::nn::functional::pad(
+            tensor_clone,
+            //The padding function option argument is the padding applied to the various sides of the tensor.
+            //It's arranged last_dim_"left", last_dim_right, second_to_last_left, etc...
+            //Later on, the FRER spectrum we get will be padded automatically on the wires dimension on the right
+            //hence the order given here
+            // Also we only give the additional size it must be padded with
+            torch::nn::functional::PadFuncOptions({0, 0, 0, response_length-1}).mode(torch::kConstant)
+        );
+
+        log->debug("Padded to {} ", tensor_clone.sizes()[0]);
+        shape[0] = tensor_clone.sizes()[0];
+    }
+
+
 
     //FFT on time dim
     tensor_clone = torch::fft::rfft(tensor_clone, std::nullopt, 1);
@@ -99,6 +122,15 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         //Shift along wire dimension
         tensor_clone = tensor_clone.roll(wire_shift, 0);
         tensor_clone = tensor_clone.roll(time_shift, 1);
+    }
+
+    if (m_pad_wire_domain) {
+        //This selects the post-roll block
+        using namespace torch::indexing;
+        auto unpadded_width = shape[0] - (base_frer_spectrum->shape()[0]-1);
+        tensor_clone = tensor_clone.index(
+            {Slice(None, unpadded_width)}
+        );
     }
 
     Configuration set_md, tensor_md;

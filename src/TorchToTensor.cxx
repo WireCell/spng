@@ -39,9 +39,9 @@ bool TorchToTensor::operator()(const input_pointer& torchset_in, output_pointer&
         auto tensor_clone = tensor_ptr->tensor().clone().to(torch::kCPU).contiguous();
         // const auto shape = ten->shape();
     
-        std::vector<float> as_vec(
-            tensor_clone.data_ptr<float>(),
-            tensor_clone.data_ptr<float>() + tensor_clone.numel());
+        std::vector<double> as_vec(
+            tensor_clone.data_ptr<double>(),
+            tensor_clone.data_ptr<double>() + tensor_clone.numel());
 
         //Make a torch::Tensor from the tensor data
         auto sizes = tensor_ptr->tensor().sizes();

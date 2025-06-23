@@ -14,7 +14,7 @@ local wc = import 'wirecell.jsonnet';
 
 // function make_wpid(tools)
 {
-    make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false) {
+    make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
 
         local ROI_loose_lf = {
             data: {
@@ -336,8 +336,8 @@ local wc = import 'wirecell.jsonnet';
             ret : g.pnode({
                 type: 'TorchTensorSetReplicator',
                 name: 'post_gaus_replicator_%d_%d' % [anode.data.ident, iplane],
-                data: {multiplicity: (if iplane > 1 then 2 else 5)}
-            }, nin=1, nout=(if iplane > 1 then 2 else 5), uses=[anode])
+                data: {multiplicity: (if iplane > 1 then 2 else 6)}
+            }, nin=1, nout=(if iplane > 1 then 2 else 6), uses=[anode])
         }.ret,
         local make_pipeline(anode, iplane, apply_gaus=true, do_roi_filters=false) = {
             local the_field = if std.length(tools.fields) > 1 then tools.fields[anode.data.ident] else tools.fields[0],
@@ -376,6 +376,7 @@ local wc = import 'wirecell.jsonnet';
                     debug_no_wire_filter: false,
                     debug_no_roll: false,
                     debug_force_cpu: debug_force_cpu,
+                    pad_wire_domain: (iplane > 1), #Non-periodic planes get padded
                 },
             },
             nin=1, nout=1,
@@ -544,22 +545,22 @@ local wc = import 'wirecell.jsonnet';
                 type: 'TorchTensorSetCollator',
                 name: 'collate_%d_%d' % [anode.data.ident, iplane],
                 data: {
-                    output_set_tag: 'collated',
-                    // multiplicity: 2,
-                    multiplicity: (if iplane < 2 then 5 else 2),
+                    output_set_tag: 'collated_%d' % iplane,
+                    // multiplicity: (if iplane < 2 then 5 else 2),
+                    multiplicity: (if iplane < 2 then 6 else 2),
                 },
-            }, nin=if iplane < 2 then 5 else 2, nout=1),
-            // }, nin=2, nout=1),
+            // }, nin=if iplane < 2 then 5 else 2, nout=1),
+            }, nin=if iplane < 2 then 6 else 2, nout=1),
 
-            local replicate_then_wiener = g.intern(
-                innodes=[post_gaus_replicator],
-                outnodes=[apply_wiener_tight, apply_wiener_wide],
-                centernodes=[],
-                edges = [
-                    g.edge(post_gaus_replicator, apply_wiener_tight, 0),
-                    g.edge(post_gaus_replicator, apply_wiener_wide, 1),
-                ]
-            ),
+            // local replicate_then_wiener = g.intern(
+            //     innodes=[post_gaus_replicator],
+            //     outnodes=[apply_wiener_tight, apply_wiener_wide],
+            //     centernodes=[],
+            //     edges = [
+            //         g.edge(post_gaus_replicator, apply_wiener_tight, 0),
+            //         g.edge(post_gaus_replicator, apply_wiener_wide, 1),
+            //     ]
+            // ),
             // local post_gaus_filters = g.intern(
             //     innodes=[replicate_then_wiener],
             //     outnodes=[collator],
@@ -617,6 +618,8 @@ local wc = import 'wirecell.jsonnet';
 
                     g.edge(post_gaus_replicator_simple, apply_loose_roi, 4, 0),
                     g.edge(apply_loose_roi, collator, 0, 4),
+
+                    g.edge(post_gaus_replicator_simple, collator, 5, 5),
                 ],
             ) else g.intern(
                 innodes=[post_gaus_replicator_simple],
@@ -628,41 +631,28 @@ local wc = import 'wirecell.jsonnet';
 
                     g.edge(post_gaus_replicator_simple, apply_wiener_wide, 1, 0),
                     g.edge(apply_wiener_wide, collator, 0, 1),
+
+                    // g.edge(post_gaus_replicator_simple, collator, 2, 2)
+
                 ],
             ),
 
 
             local full_pipeline = (
                 decon_and_gaus + 
-                (if do_roi_filters then [post_gaus_filters] else []) +
-                convert_and_sink
+                (if do_roi_filters then [post_gaus_filters] else []) // +
             ),
 
             ret : g.pipeline(
                 full_pipeline
-                // [
-                //     spng_decon,
-                //     spng_gaus_app,
-                //     torch_to_tensor,
-                //     tensor_sink,
-                // ]
             ),
             
-            // ret : g.intern(
-            //     innodes=[spng_decon],
-            //     centernodes=[spng_gaus_app, torch_to_tensor, tensor_sink],
-            //     outnodes=[tensor_sink],
-            //     edges = [
-            //         g.edge(spng_decon, spng_gaus_app),
-            //         g.edge(spng_gaus_app, torch_to_tensor),
-            //         g.edge(torch_to_tensor, tensor_sink),
-            //     ]
-            // )
+
         }.ret,
 
         // local tf_fans = [make_fanout(a) for a in tools.anodes],
         
-        local spng_fanout(anode, apply_gaus=true, do_roi_filters=false) = {
+        local spng_fanout(anode, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) = {
 
             #FrameToTorchSetFanout
             local tf_fan = make_fanout(anode),
@@ -672,21 +662,86 @@ local wc = import 'wirecell.jsonnet';
                 make_pipeline(anode, iplane, apply_gaus, do_roi_filters)
                 for iplane in std.range(0, 3)
             ],
+            local torch_to_tensors_planes = [g.pnode({
+                type: 'TorchToTensor',
+                name: 'torchtotensor_%d_%d' % [anode.data.ident, iplane],
+                data: {},
+            }, nin=1, nout=1) for iplane in std.range(0,3)],
 
-            ret : g.intern(
-                innodes=[tf_fan],
-                outnodes=pipelines,
-                edges=[
-                    g.edge(tf_fan, pipelines[0], 0),
-                    g.edge(tf_fan, pipelines[1], 1),
-                    g.edge(tf_fan, pipelines[2], 2),
-                    g.edge(tf_fan, pipelines[3], 3),
-                ]
-              ),
+            local tensor_sinks_planes = [g.pnode({
+                type: 'TensorFileSink',
+                name: 'tfsink_%d_%d' % [anode.data.ident, iplane],
+                data: {
+                    outname: 'testout_fan_apa%d_plane%d.tar' % [anode.data.ident, iplane],
+                    prefix: ''
+                },
+            }, nin=1, nout=0) for iplane in std.range(0,3)],
+
+            local full_pipelines = [
+                g.pipeline(
+                    [pipelines[iplane], torch_to_tensors_planes[iplane], tensor_sinks_planes[iplane]]
+                )
+            for iplane in std.range(0,3)],
+
+            local apa_collator = g.pnode({
+                type: 'TorchTensorSetCollator',
+                name: 'apa_collate_%d' % [anode.data.ident],
+                data: {
+                    output_set_tag: 'apa_collated',
+                    multiplicity:4,
+                },
+            }, nin=4, nout=1),
+
+            local torch_to_tensors_apa = g.pnode({
+                type: 'TorchToTensor',
+                name: 'torchtotensor_%d' % [anode.data.ident],
+                data: {},
+            }, nin=1, nout=1),
+            local tensor_sinks_apa = g.pnode({
+                type: 'TensorFileSink',
+                name: 'tfsink_%d' % [anode.data.ident],
+                data: {
+                    outname: 'testout_fan_apa%d.tar' % [anode.data.ident],
+                    prefix: ''
+                },
+            }, nin=1, nout=0),
+
+            local apa_pipeline = g.pipeline(
+                [apa_collator, torch_to_tensors_apa, tensor_sinks_apa]
+            ),
+
+            ret : (if !do_collate_apa then
+                g.intern(
+                    innodes=[tf_fan],
+                    // centernodes=[]
+                    outnodes=full_pipelines,
+                    edges=[
+                        g.edge(tf_fan, full_pipelines[0], 0),
+                        g.edge(tf_fan, full_pipelines[1], 1),
+                        g.edge(tf_fan, full_pipelines[2], 2),
+                        g.edge(tf_fan, full_pipelines[3], 3),
+                    ]
+                ) else
+                g.intern(
+                    innodes=[tf_fan],
+                    centernodes=pipelines,
+                    outnodes=[apa_pipeline],
+                    edges=[
+                        g.edge(tf_fan, pipelines[0], 0),
+                        g.edge(tf_fan, pipelines[1], 1),
+                        g.edge(tf_fan, pipelines[2], 2),
+                        g.edge(tf_fan, pipelines[3], 3),
+                        g.edge(pipelines[0], apa_pipeline, 0, 0),
+                        g.edge(pipelines[1], apa_pipeline, 0, 1),
+                        g.edge(pipelines[2], apa_pipeline, 0, 2),
+                        g.edge(pipelines[3], apa_pipeline, 0, 3),
+                    ]
+                )
+            ),
         }.ret,
         
         ret : [
-            spng_fanout(anode, apply_gaus=apply_gaus, do_roi_filters=do_roi_filters) for anode in tools.anodes
+            spng_fanout(anode, apply_gaus=apply_gaus, do_roi_filters=do_roi_filters, do_collate_apa=do_collate_apa) for anode in tools.anodes
         ],
     }.ret,
 

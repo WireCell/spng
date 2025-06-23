@@ -29,7 +29,8 @@ void SPNG::TorchTensorSetCollator::configure(const WireCell::Configuration& conf
 {
     //Get the anode to make a channel map for output
     m_multiplicity = get(config, "multiplicity", m_multiplicity);
-    m_output_set_tag = get(config, "output_set_tag", m_output_set_tag);
+    m_output_set_tag = get(config, "output_set_tag", m_output_set_tag.asString());
+    log->debug("Will tag output set with {}", m_output_set_tag);
 }
 
 std::vector<std::string> SPNG::TorchTensorSetCollator::input_types()
@@ -74,6 +75,7 @@ bool SPNG::TorchTensorSetCollator::operator()(const input_vector& inv, output_po
         for (auto tensor : (*in->tensors())) {
             auto this_tensor_tag = tensor->metadata()["tag"];
             std::string combined_tag = this_set_tag.asString() + ":" + this_tensor_tag.asString();
+            log->debug("Adding tensor with tag {}", combined_tag);
             Configuration tensor_md;
             tensor_md["tag"] = combined_tag;
             itv.push_back(
@@ -84,6 +86,7 @@ bool SPNG::TorchTensorSetCollator::operator()(const input_vector& inv, output_po
 
     Configuration output_md;
     output_md["tag"] = m_output_set_tag;
+    log->debug("Writing out Tensor Set with output set tag {} {}", output_md["tag"], m_output_set_tag);
     out = std::make_shared<SimpleTorchTensorSet>(
         inv.at(0)->ident(), output_md,
         std::make_shared<std::vector<ITorchTensor::pointer>>(itv)
