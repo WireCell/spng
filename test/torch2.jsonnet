@@ -505,6 +505,7 @@ local wc = import 'wirecell.jsonnet';
             nin=1, nout=1,
             uses=[torch_gaus_filter]),
 
+            ##TODO -- remove
             local spng_roi = g.pnode({
                 type: 'SPNGROITests',
                 name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
@@ -645,7 +646,7 @@ local wc = import 'wirecell.jsonnet';
                     // g.edge(post_gaus_replicator_simple, collator, 2, 2)
 
                 ],
-
+            ),
 
 
             local full_pipeline = (
@@ -655,9 +656,7 @@ local wc = import 'wirecell.jsonnet';
 
             ret : g.pipeline(
                 full_pipeline
-            ),
-            
-
+            )
         }.ret,
 
         // local tf_fans = [make_fanout(a) for a in tools.anodes],
@@ -715,9 +714,16 @@ local wc = import 'wirecell.jsonnet';
                     prefix: ''
                 },
             }, nin=1, nout=0),
-
+            local spng_roi_apa = g.pnode({
+                type: 'SPNGROITests',
+                name: 'spng_roi_apa%d' % [anode.data.ident],
+                data:{
+                    "apa": anode.data.ident,
+                 },
+            }, nin=1, nout=1
+            ),
             local apa_pipeline = g.pipeline(
-                [apa_collator, torch_to_tensors_apa, tensor_sinks_apa]
+                [apa_collator, spng_roi_apa, torch_to_tensors_apa, tensor_sinks_apa]
             ),
 
             ret : (if !do_collate_apa then
