@@ -1,8 +1,8 @@
-#include "WireCellPytorch/TorchContext.h"
+#include "WireCellSpng/TorchContext.h"
 #include "WireCellUtil/NamedFactory.h"
 
 using namespace WireCell;
-using namespace WireCell::Pytorch;
+using namespace WireCell::SPNG;
 
 TorchContext::TorchContext() {}
 TorchContext::~TorchContext() { }

@@ -46,7 +46,6 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
     auto sizes = tensor_clone.sizes();
     //log->debug("Tensor sizes: {}", sizes);
-
-
+    
     return true;
 }

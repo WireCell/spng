@@ -133,7 +133,10 @@ local wc = import 'wirecell.jsonnet';
             local spng_roi = g.pnode({
                 type: 'SPNGROITests',
                 name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
-                data:{ },
+                data:{
+                    "apa": anode.data.ident,
+                    "plane": iplane,
+                 },
             }, nin=1, nout=1
             ),
             local torch_to_tensor = g.pnode({

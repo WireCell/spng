@@ -1,14 +1,15 @@
-#include "WireCellPytorch/TorchService.h"
-#include "WireCellPytorch/Util.h"
+#include "WireCellSpng/TorchService.h"
+#include "WireCellSpng/Util.h"
 #include "WireCellUtil/NamedFactory.h"
 #include "WireCellUtil/String.h"
 #include "WireCellUtil/Persist.h"
 
-#include <omp.h>
+//do we rely on openMP...probably not..
+//#include <omp.h>
 #include <ATen/Parallel.h>
 
 WIRECELL_FACTORY(TorchService, 
-                 WireCell::Pytorch::TorchService,
+                 WireCell::SPNG::TorchService,
                  WireCell::ITensorForward,
                  WireCell::IConfigurable)
 
@@ -16,9 +17,11 @@ using namespace WireCell;
 
 
 
-Pytorch::TorchService::TorchService()
+SPNG::TorchService::TorchService()
     : Aux::Logger("TorchService", "torch")
 {
+    //TODO: Need to rewrite for whatever we plan for SPNG
+    /*
   // set the number of threads to OMP_NUM_THREADS
   const char* env_var = std::getenv("OMP_NUM_THREADS");
   if (env_var != NULL) {
@@ -32,9 +35,10 @@ Pytorch::TorchService::TorchService()
     } // env var not set
   }
   log->info("TorchService parallel info:\n{}",  at::get_parallel_info());
+  */
 }
 
-Configuration Pytorch::TorchService::default_configuration() const
+Configuration SPNG::TorchService::default_configuration() const
 {
     Configuration cfg;
 
@@ -48,7 +52,7 @@ Configuration Pytorch::TorchService::default_configuration() const
     return cfg;
 }
 
-void Pytorch::TorchService::configure(const WireCell::Configuration& cfg)
+void SPNG::TorchService::configure(const WireCell::Configuration& cfg)
 {
     auto dev = get<std::string>(cfg, "device", "cpu");
     m_ctx.connect(dev);
@@ -74,8 +78,12 @@ void Pytorch::TorchService::configure(const WireCell::Configuration& cfg)
     log->debug("loaded model \"{}\" to device \"{}\"",
                model_path, m_ctx.devname());
 }
-
-ITensorSet::pointer Pytorch::TorchService::forward(const ITensorSet::pointer& in) const
+ITensorSet::pointer SPNG::TorchService::forward(const ITensorSet::pointer& in) const
+{
+    return nullptr;
+}
+/*
+ITensorSet::pointer SPNG::TorchService::forward(const ITensorSet::pointer& in) const
 {
     TorchSemaphore sem(m_ctx);
 
@@ -83,7 +91,7 @@ ITensorSet::pointer Pytorch::TorchService::forward(const ITensorSet::pointer& in
 
     torch::NoGradGuard no_grad;
 
-    std::vector<torch::IValue> iival = Pytorch::from_itensor(in, m_ctx.is_gpu());
+    std::vector<torch::IValue> iival = SPNG::from_itensor(in, m_ctx.is_gpu());
 
     torch::IValue oival;
     try {
@@ -95,7 +103,8 @@ ITensorSet::pointer Pytorch::TorchService::forward(const ITensorSet::pointer& in
         return nullptr;
     }
 
-    ITensorSet::pointer ret = Pytorch::to_itensor({oival});
+    ITensorSet::pointer ret = SPNG::to_itensor({oival});
 
     return ret;
 }
+*/
