@@ -381,7 +381,6 @@ local wc = import 'wirecell.jsonnet';
             },
             nin=1, nout=1,
             uses=[torch_frer, the_wire_filter]),
-<<<<<<< HEAD
 
             local the_wiener_tight = if iplane < 3 then wiener_tight_filters[iplane] else wiener_tight_filters[2],
             local the_torch_wiener_tight = if iplane < 3 then torch_wiener_tight_filters[iplane] else torch_wiener_tight_filters[2],
@@ -506,7 +505,6 @@ local wc = import 'wirecell.jsonnet';
             nin=1, nout=1,
             uses=[torch_gaus_filter]),
 
-=======
             local spng_roi = g.pnode({
                 type: 'SPNGROITests',
                 name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
@@ -516,12 +514,11 @@ local wc = import 'wirecell.jsonnet';
                  },
             }, nin=1, nout=1
             ),
->>>>>>> 9af3804 (more edits to port the DNN ROI)
+
             local torch_to_tensor = g.pnode({
                 type: 'TorchToTensor',
                 name: 'torchtotensor_%d_%d' % [anode.data.ident, iplane],
                 data: {},
-<<<<<<< HEAD
             }, nin=1, nout=1),
 
             local tagger = g.pnode({
@@ -536,10 +533,6 @@ local wc = import 'wirecell.jsonnet';
                 }
             }, nin=1, nout=1),
 
-=======
-            }, nin=1, nout=1
-            ),
->>>>>>> 9af3804 (more edits to port the DNN ROI)
             local tensor_sink = g.pnode({
                 type: 'TensorFileSink',
                 name: 'tfsink_%d_%d' % [anode.data.ident, iplane],
@@ -549,7 +542,6 @@ local wc = import 'wirecell.jsonnet';
                 },
             }, nin=1, nout=0),
 
-<<<<<<< HEAD
 
             local decon_and_gaus = [spng_decon] + (if apply_gaus then [spng_gaus_app] else []),
             local convert_and_sink = [torch_to_tensor, tensor_sink],
@@ -653,16 +645,7 @@ local wc = import 'wirecell.jsonnet';
                     // g.edge(post_gaus_replicator_simple, collator, 2, 2)
 
                 ],
-=======
-            ret : g.pipeline(
-                [
-                    spng_decon,
-                    spng_roi,
-                    torch_to_tensor,
-                    tensor_sink,
-                ]
->>>>>>> 9af3804 (more edits to port the DNN ROI)
-            ),
+
 
 
             local full_pipeline = (
