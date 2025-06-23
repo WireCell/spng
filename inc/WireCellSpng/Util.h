@@ -8,6 +8,8 @@
 #define WIRECELLTORCHUTIL
 
 #include <torch/torch.h>
+#include "WireCellIface/ITensorSet.h"
+//#include "WireCellSpng/Torch.h"
 
 // Capitalized "Torch" namespace should not collide with any in torch, proper.
 namespace WireCell::Torch {
@@ -67,7 +69,10 @@ namespace WireCell::Torch {
     torch::Tensor filtered_decon_2d_auto(const std::vector<torch::Tensor>& filters,
                                          const std::vector<torch::Tensor>& responses,
                                          torch::IntArrayRef extra_shape = {0,0});
-
+    
+    std::vector<torch::IValue> from_itensor(const ITensorSet::pointer& in, bool is_gpu = false);
+    
+    ITensor::pointer to_itensor(const std::vector<torch::IValue>& inputs);
 }
 
 #endif

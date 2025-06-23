@@ -1,4 +1,8 @@
 #include "WireCellSpng/Util.h"
+#include "WireCellSpng/SimpleTorchTensor.h"
+#include "WireCellSpng/SimpleTorchTensorSet.h"
+#include "WireCellSpng/ITorchSet.h"
+
 #include <cmath>
 using namespace WireCell;
 
@@ -109,3 +113,11 @@ torch::Tensor Torch::filtered_decon_2d_auto(const std::vector<torch::Tensor>& nu
     return filtered_decon_2d(numerator, denominator, shape);
 }
 
+
+std::vector<torch::IValue> Torch::from_itensor(const ITensorSet::pointer& in, bool is_gpu)
+{
+    // Create a new SimpleTorchTensorSet to hold the converted tensors
+    std::vector<torch::IValue> ret;
+    //Populate this function as needed...
+    return ret;
+}
