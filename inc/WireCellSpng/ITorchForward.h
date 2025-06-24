@@ -7,12 +7,12 @@
 #include "WireCellSpng/ITorchSet.h"
 
 namespace WireCell::SPNG{
-    class ITorchForward : public IComponent<ITorchForward> {
+    class ITorchForward : public IFunctionNode<ITorchTensorSet,ITorchTensorSet> {
       public:
-        virtual ~ITorchForward();
+        virtual ~ITorchForward() {};
 
-        virtual ITorchSet::pointer forward(const ITorchSet::pointer& input) const = 0;
-    };
+        virtual std::string signature() { return typeid(ITorchForward).name(); }
+      };
 }  // namespace WireCell
 
 #endif  // WIRECELL_ITorchFORWARD

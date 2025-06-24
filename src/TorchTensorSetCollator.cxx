@@ -49,8 +49,8 @@ SPNG::TorchTensorSetCollator::TorchTensorSetCollator()
 
 bool SPNG::TorchTensorSetCollator::operator()(const input_vector& inv, output_pointer& out) {
     out = nullptr;
-
-
+    
+    std::cout<<"Calling the TorchTensorSetCollator operator()"<<std::endl;
     size_t neos = 0;
     for (const auto& in : inv) {
         if (!in) {

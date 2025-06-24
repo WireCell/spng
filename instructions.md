@@ -73,8 +73,28 @@ cfg=./
 export WIRECELL_PATH=$cfg:$WIRECELL_PATH 
 wire-cell -l stdout -L debug -P ../../toolkit/cfg/ -P $cfg -V SPNG=1 -C elecGain=7.8  wct-framesource_new.jsonnet 
 ```
+## After Decon and collated:
+```bash
+# Create source for the SPNG
+cfg=/cvmfs/dune.opensciencegrid.org/products/dune/dunereco/v10_03_01d01/wire-cell-cfg/
+export WIRECELL_PATH=$cfg:$WIRECELL_PATH 
+wire-cell -l stdout -L debug -P ../../toolkit/cfg/ -P $cfg -V SPNG=1 -C elecGain=7.8  wct-sim-framesink.jsonnet
+
+# Reset cfg path and run the SPNG DECON
+cfg=./
+export WIRECELL_PATH=$cfg:$WIRECELL_PATH 
+wire-cell -l stdout -L debug -P ../../toolkit/cfg/ -P $cfg -V SPNG=1 -V ApplyGaus=1 -V ROI=1 -V CollateAPAs=1 -C elecGain=7.8  wct-framesource_new.jsonnet 
+
+
+```
 
 # Create the SPNG Workflow
 ```bash
 wirecell-pgraph dotify  -V elecGain=7.8 -V SPNG=1 wct-framesource_new.jsonnet output_spng.pdf
 ```
+
+# Post Jake Edits:
+```bash
+wirecell-pgraph dotify -V elecGain=7.8 -V SPNG=1 -V ApplyGaus=1 -V ROI=1 -V CollateAPAs=1  wct-framesource_new.jsonnet output_spng_roi.pdf
+```
+

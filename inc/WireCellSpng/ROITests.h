@@ -2,7 +2,8 @@
 #define WIRECELL_SPNGROITests
 
 #include "WireCellAux/Logger.h"
-#include "WireCellSpng/ITorchTensorSetFilter.h"
+//#include "WireCellSpng/ITorchTensorSetFilter.h"
+#include "WireCellSpng/ITorchToTensorSet.h"
 #include "WireCellSpng/ITorchForward.h"
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellSpng/ITorchSpectrum.h"
@@ -86,8 +87,9 @@ namespace WireCell {
         };
 
 
-        class ROITests : public Aux::Logger,
-                      public ITorchTensorSetFilter, public IConfigurable {
+        class ROITests : public Aux::Logger, 
+                      public ITorchForward,                      
+                      public IConfigurable {
         public:
             ROITests( );
             virtual ~ROITests();
@@ -106,13 +108,13 @@ namespace WireCell {
             std::vector<int>m_chlist; // channels to process in order
             size_t m_nrows{0}, m_ncols{0};
 
-            ITorchForward::pointer m_forward{nullptr};
+            //ITorchForward::pointer m_forward{nullptr};
             //IFrame::traces_t m_traces; // input traces
             //Equivalent of IFrame::traces_t but for Torch tensors
             //ITorchTensorSet::pointer m_tensors; // input tensors
             
             
-            std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;
+            //std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;
             int m_coarse_time_offset = 0;
         };
     }

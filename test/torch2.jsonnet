@@ -381,18 +381,160 @@ local wc = import 'wirecell.jsonnet';
             },
             nin=1, nout=1,
             uses=[torch_frer, the_wire_filter]),
+
+            local the_wiener_tight = if iplane < 3 then wiener_tight_filters[iplane] else wiener_tight_filters[2],
+            local the_torch_wiener_tight = if iplane < 3 then torch_wiener_tight_filters[iplane] else torch_wiener_tight_filters[2],
+            local the_torch_wiener_wide = if iplane < 3 then torch_wiener_wide_filters[iplane] else torch_wiener_wide_filters[2],
+
+            local torch_roi_tight = {
+                    type: "Torch1DSpectrum",
+                    name: "torch_1dspec_roi_tight",
+                    uses: [the_wiener_tight, ROI_tight_lf],
+                    data: {
+                        spectra: [
+                            wc.tn(the_wiener_tight),
+                            wc.tn(ROI_tight_lf),
+                        ],
+                        debug_force_cpu: debug_force_cpu,
+                    },
+            },
+            local torch_roi_tighter = {
+                    type: "Torch1DSpectrum",
+                    name: "torch_1dspec_roi_tighter",
+                    uses: [the_wiener_tight, ROI_tighter_lf],
+                    data: {
+                        spectra: [
+                            wc.tn(the_wiener_tight),
+                            wc.tn(ROI_tighter_lf),
+                        ],
+                        debug_force_cpu: debug_force_cpu,
+                    },
+            },
+
+            
+            local torch_roi_loose = {
+                    type: "Torch1DSpectrum",
+                    name: "torch_1dspec_roi_loose",
+                    uses: [the_wiener_tight, ROI_loose_lf, ROI_tight_lf],
+                    data: {
+                        spectra: [
+                            wc.tn(the_wiener_tight),
+                            wc.tn(ROI_loose_lf),
+                            wc.tn(ROI_tight_lf),
+                        ],
+                        debug_force_cpu: debug_force_cpu,
+                    },
+            },
+
+
+            local apply_wiener_tight = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_wiener_tight_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(the_torch_wiener_tight),
+                    dimension: 1,
+                    // target_tensor: "HfGausWide",
+                    output_set_tag: "WienerTight",
+                },
+            },
+            nin=1, nout=1,
+            uses=[the_torch_wiener_tight]),
+            
+            local apply_wiener_wide = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_wiener_wide_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(the_torch_wiener_wide),
+                    dimension: 1,
+                    // target_tensor: "HfGausWide",
+                    output_set_tag: "WienerWide",
+                },
+            },
+            nin=1, nout=1,
+            uses=[the_torch_wiener_wide]),
+            
+            local apply_loose_roi = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_loose_roi_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(torch_roi_loose),
+                    dimension: 1,
+                    // target_tensor: 'HfGausWide',
+                    output_set_tag: 'ROILoose',
+                },
+            },
+            nin=1, nout=1,
+            uses=[torch_roi_loose]),
+            
+            local apply_tight_roi = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_tight_roi_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(torch_roi_tight),
+                    dimension: 1,
+                    // target_tensor: 'HfGausWide',
+                    output_set_tag: 'ROITight',
+                },
+            },
+            nin=1, nout=1,
+            uses=[torch_roi_tight]),
+
+            local apply_tighter_roi = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_tighter_roi_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(torch_roi_tighter),
+                    dimension: 1,
+                    // target_tensor: 'HfGausWide',
+                    output_set_tag: 'ROITighter',
+                },
+            },
+            nin=1, nout=1,
+            uses=[torch_roi_tighter]),
+
+            local spng_gaus_app = g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_gaus_apa%d_plane%d' % [anode.data.ident, iplane],
+                data: {
+                    base_spectrum_name: wc.tn(torch_gaus_filter), #put in if statement
+                    dimension: 1,
+                    // target_tensor: "Default",
+                    output_set_tag: "HfGausWide",
+                },
+            },
+            nin=1, nout=1,
+            uses=[torch_gaus_filter]),
+
+            ##TODO -- remove
+            
             local spng_roi = g.pnode({
                 type: 'SPNGROITests',
                 name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
-                data:{ },
+                data:{
+                    "apa": anode.data.ident,
+                    "plane": iplane,
+                 },
             }, nin=1, nout=1
             ),
+
             local torch_to_tensor = g.pnode({
                 type: 'TorchToTensor',
                 name: 'torchtotensor_%d_%d' % [anode.data.ident, iplane],
                 data: {},
-            }, nin=1, nout=1
-            ),
+            }, nin=1, nout=1),
+
+            local tagger = g.pnode({
+                type: 'SPNGTorchTensorSetTagger',
+                name: 'test_tagger_%d_%d' % [anode.data.ident, iplane],
+                data: {
+                    allow_retagging: false,
+                    tag_list: {
+                        a: '1',
+                        b: '2',
+                    },
+                }
+            }, nin=1, nout=1),
+
             local tensor_sink = g.pnode({
                 type: 'TensorFileSink',
                 name: 'tfsink_%d_%d' % [anode.data.ident, iplane],
@@ -402,14 +544,35 @@ local wc = import 'wirecell.jsonnet';
                 },
             }, nin=1, nout=0),
 
-            ret : g.pipeline(
-                [
-                    spng_decon,
-                    spng_roi,
-                    torch_to_tensor,
-                    tensor_sink,
-                ]
-            ),
+
+            local decon_and_gaus = [spng_decon] + (if apply_gaus then [spng_gaus_app] else []),
+            local convert_and_sink = [torch_to_tensor, tensor_sink],
+
+            local post_gaus_replicator = make_replicator_post_gaus(anode, iplane),
+            local post_tight_replicator = if iplane < 2 then make_replicator_post_tight(anode, iplane) else null,
+
+            local post_gaus_replicator_simple = make_replicator_post_gaus_simple(anode, iplane),
+
+            local collator = g.pnode({
+                type: 'TorchTensorSetCollator',
+                name: 'collate_%d_%d' % [anode.data.ident, iplane],
+                data: {
+                    output_set_tag: 'collated_%d' % iplane,
+                    // multiplicity: (if iplane < 2 then 5 else 2),
+                    multiplicity: (if iplane < 2 then 6 else 2),
+                },
+            // }, nin=if iplane < 2 then 5 else 2, nout=1),
+            }, nin=if iplane < 2 then 6 else 2, nout=1),
+
+            // local replicate_then_wiener = g.intern(
+            //     innodes=[post_gaus_replicator],
+            //     outnodes=[apply_wiener_tight, apply_wiener_wide],
+            //     centernodes=[],
+            //     edges = [
+            //         g.edge(post_gaus_replicator, apply_wiener_tight, 0),
+            //         g.edge(post_gaus_replicator, apply_wiener_wide, 1),
+            //     ]
+            // ),
             // local post_gaus_filters = g.intern(
             //     innodes=[replicate_then_wiener],
             //     outnodes=[collator],
@@ -514,7 +677,17 @@ local wc = import 'wirecell.jsonnet';
                 name: 'torchtotensor_%d_%d' % [anode.data.ident, iplane],
                 data: {},
             }, nin=1, nout=1) for iplane in std.range(0,3)],
-
+            
+            local spng_roi_planes = [g.pnode({
+                type: 'SPNGROITests',
+                name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
+                data:{
+                    "apa": anode.data.ident,
+                    "plane": iplane,
+                 },
+            }, nin=1, nout=1),
+            for iplane in std.range(0,3)],
+            
             local tensor_sinks_planes = [g.pnode({
                 type: 'TensorFileSink',
                 name: 'tfsink_%d_%d' % [anode.data.ident, iplane],
@@ -526,7 +699,7 @@ local wc = import 'wirecell.jsonnet';
 
             local full_pipelines = [
                 g.pipeline(
-                    [pipelines[iplane], torch_to_tensors_planes[iplane], tensor_sinks_planes[iplane]]
+                    [pipelines[iplane], spng_roi_planes[iplane], torch_to_tensors_planes[iplane], tensor_sinks_planes[iplane]]
                 )
             for iplane in std.range(0,3)],
 
@@ -538,7 +711,15 @@ local wc = import 'wirecell.jsonnet';
                     multiplicity:4,
                 },
             }, nin=4, nout=1),
-
+            local spng_roi_apa = g.pnode({
+                type: 'SPNGROITests',
+                name: 'spng_roi_apa%d' % [anode.data.ident],
+                data:{
+                    "apa": anode.data.ident,
+                    
+                 },
+            }, nin=1, nout=1
+            ),
             local torch_to_tensors_apa = g.pnode({
                 type: 'TorchToTensor',
                 name: 'torchtotensor_%d' % [anode.data.ident],
@@ -552,14 +733,6 @@ local wc = import 'wirecell.jsonnet';
                     prefix: ''
                 },
             }, nin=1, nout=0),
-            local spng_roi_apa = g.pnode({
-                type: 'SPNGROITests',
-                name: 'spng_roi_apa%d' % [anode.data.ident],
-                data:{
-                    "apa": anode.data.ident,
-                 },
-            }, nin=1, nout=1
-            ),
             local apa_pipeline = g.pipeline(
                 [apa_collator, spng_roi_apa, torch_to_tensors_apa, tensor_sinks_apa]
             ),

@@ -25,6 +25,7 @@ bool TorchToTensor::operator()(const input_pointer& torchset_in, output_pointer&
 {
     //Setup output + basic check
     its = nullptr;
+    std::cout<<"Calling the TorchToTensor operator()"<<std::endl;
     if (! torchset_in) {
         // eos
         return true;
