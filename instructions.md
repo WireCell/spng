@@ -83,7 +83,7 @@ wire-cell -l stdout -L debug -P ../../toolkit/cfg/ -P $cfg -V SPNG=1 -C elecGain
 # Reset cfg path and run the SPNG DECON
 cfg=./
 export WIRECELL_PATH=$cfg:$WIRECELL_PATH 
-wire-cell -l stdout -L debug -P ../../toolkit/cfg/ -P $cfg -V SPNG=1 -V ApplyGaus=1 -V ROI=1 -V CollateAPAs=1 -C elecGain=7.8  wct-framesource_new.jsonnet 
+wire-cell -l stdout -L debug -P ../../toolkit/cfg/ -P $cfg -V SPNG=1 -C ApplyGaus=1 -C ROI=1 -C CollateAPAs=1 -C elecGain=7.8  wct-framesource_new.jsonnet 
 
 
 ```

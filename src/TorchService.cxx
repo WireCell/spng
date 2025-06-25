@@ -10,7 +10,7 @@
 
 WIRECELL_FACTORY(TorchService, 
                  WireCell::SPNG::TorchService,
-                 WireCell::ITensorForward,
+                 WireCell::SPNG::ITorchForward, // interface 1
                  WireCell::IConfigurable)
 
 using namespace WireCell;
@@ -78,15 +78,12 @@ void SPNG::TorchService::configure(const WireCell::Configuration& cfg)
     log->debug("loaded model \"{}\" to device \"{}\"",
                model_path, m_ctx.devname());
 }
-ITensorSet::pointer SPNG::TorchService::forward(const ITensorSet::pointer& in) const
-{
-    return nullptr;
-}
-/*
-ITensorSet::pointer SPNG::TorchService::forward(const ITensorSet::pointer& in) const
-{
-    TorchSemaphore sem(m_ctx);
 
+ITorchTensorSet::pointer SPNG::TorchService::forward(const ITorchTensorSet::pointer& in) const
+{
+    ITorchTensorSet::pointer ret{nullptr};
+    TorchSemaphore sem(m_ctx);
+    /*
     log->debug("running model on device: \"{}\"", m_ctx.devname());
 
     torch::NoGradGuard no_grad;
@@ -104,7 +101,7 @@ ITensorSet::pointer SPNG::TorchService::forward(const ITensorSet::pointer& in) c
     }
 
     ITensorSet::pointer ret = SPNG::to_itensor({oival});
-
+    */
+    
     return ret;
 }
-*/

@@ -4,15 +4,15 @@
 #define WIRECELL_ITorchFORWARD
 
 #include "WireCellUtil/IComponent.h"
-#include "WireCellSpng/ITorchSet.h"
+#include "WireCellSpng/ITorchTensorSet.h"
 
 namespace WireCell::SPNG{
-    class ITorchForward : public IFunctionNode<ITorchTensorSet,ITorchTensorSet> {
-      public:
-        virtual ~ITorchForward() {};
+  class ITorchForward : public IComponent<ITorchForward> {
+    public:
+      virtual ~ITorchForward();
 
-        virtual std::string signature() { return typeid(ITorchForward).name(); }
-      };
+      virtual ITorchTensorSet::pointer forward(const ITorchTensorSet::pointer& input) const = 0;
+  };
 }  // namespace WireCell
 
 #endif  // WIRECELL_ITorchFORWARD

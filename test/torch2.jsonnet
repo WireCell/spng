@@ -507,15 +507,15 @@ local wc = import 'wirecell.jsonnet';
 
             ##TODO -- remove
             
-            local spng_roi = g.pnode({
-                type: 'SPNGROITests',
-                name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
-                data:{
-                    "apa": anode.data.ident,
-                    "plane": iplane,
-                 },
-            }, nin=1, nout=1
-            ),
+           // local spng_roi = g.pnode({
+           //     type: 'SPNGROITests',
+           //     name: 'spng_roi_apa%d_plane%d' % [anode.data.ident, iplane],
+           //     data:{
+           //         "apa": anode.data.ident,
+           //         "plane": iplane,
+           //      },
+           // }, nin=1, nout=1
+           // ),
 
             local torch_to_tensor = g.pnode({
                 type: 'TorchToTensor',
@@ -663,7 +663,6 @@ local wc = import 'wirecell.jsonnet';
         // local tf_fans = [make_fanout(a) for a in tools.anodes],
         
         local spng_fanout(anode, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) = {
-
             #FrameToTorchSetFanout
             local tf_fan = make_fanout(anode),
 

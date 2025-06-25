@@ -4,7 +4,7 @@
 #define WIRECELL_SPNG_TORCHSERVICE
 
 #include "WireCellIface/IConfigurable.h"
-#include "WireCellIface/ITensorForward.h"
+#include "WireCellSpng/ITorchForward.h"
 #include "WireCellUtil/Logging.h"
 #include "WireCellAux/Logger.h"
 #include "WireCellSpng/TorchContext.h"
@@ -13,7 +13,7 @@
 
 namespace WireCell::SPNG {
     class TorchService : public Aux::Logger,
-                         public ITensorForward,
+                         public ITorchForward,
                          public IConfigurable
     {
       public:
@@ -25,7 +25,7 @@ namespace WireCell::SPNG {
         virtual WireCell::Configuration default_configuration() const;
 
         // ITensorSetFilter interface.  This is thread-safe.
-        virtual ITensorSet::pointer forward(const ITensorSet::pointer& input) const;
+        virtual ITorchTensorSet::pointer forward(const ITorchTensorSet::pointer& input) const;
 
       private:
 
