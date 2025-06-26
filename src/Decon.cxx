@@ -5,6 +5,8 @@
 #include "WireCellSpng/SimpleTorchTensorSet.h"
 // #include "WireCellSpng/ITorchFieldResponse.h"
 #include "WireCellSpng/ITorchSpectrum.h"
+#include "WireCellUtil/FFTBestLength.h"
+
 // #include "WireCellSpng/ITorchColdElecResponse.h"
 
 WIRECELL_FACTORY(SPNGDecon, WireCell::SPNG::Decon,
@@ -29,6 +31,7 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
 
     m_coarse_time_offset = get(config, "coarse_time_offset", m_coarse_time_offset);
     m_pad_wire_domain = get(config, "pad_wire_domain", m_pad_wire_domain);
+    m_use_fft_best_length = get(config, "use_fft_best_length", m_use_fft_best_length);
 
     m_debug_no_frer = get(config, "debug_no_frer", m_debug_no_frer);
     m_debug_no_wire_filter = get(config, "debug_no_wire_filter", m_debug_no_wire_filter);
@@ -50,12 +53,29 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     log->debug("Running Decon");
 
     //Get the cloned tensor from the input
+    size_t ntensors = in->tensors()->size();
+    log->debug("Got {} tensors", ntensors);
+    std::vector<int64_t> prev_shape = {-999, -999};
+    for (size_t i = 0; i < ntensors; ++i) {
+        auto this_sizes = in->tensors()->at(i)->tensor().sizes();
+        if (i == 0) {
+            prev_shape = this_sizes;
+        }
+        // if (prev_shape[0] != this_sizes[0] || prev_shape[1] != this_sizes[1]) {
+        //     log->debug("Size mismatch in tensors");
+        //     //TODO -- throw error
+        // }
+        log->debug("Tensor {} has shape {} {}", i, this_sizes[0], this_sizes[1]);
+    }
+
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
     auto sizes = tensor_clone.sizes();
     std::vector<int64_t> shape;
     for (const auto & s : sizes) {
         shape.push_back(s);
     }
+
+    int64_t original_nchans = shape[0];
 
     
     // TODO -- Padding in time domain then trim
@@ -66,6 +86,14 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         // auto input_length = shape[0];
         auto response_length = base_frer_spectrum->shape()[0];
 
+        auto padding_size = response_length - 1;
+
+        if (m_use_fft_best_length) {
+            auto suggested_length = fft_best_length(original_nchans + response_length - 1);
+            log->debug("FFT best length suggested {}", suggested_length);
+            padding_size = suggested_length - original_nchans;
+        }
+
         //Pad to M+N-1 size 
         tensor_clone = torch::nn::functional::pad(
             tensor_clone,
@@ -74,7 +102,8 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
             //Later on, the FRER spectrum we get will be padded automatically on the wires dimension on the right
             //hence the order given here
             // Also we only give the additional size it must be padded with
-            torch::nn::functional::PadFuncOptions({0, 0, 0, response_length-1}).mode(torch::kConstant)
+            torch::nn::functional::PadFuncOptions({0, 0, 0, padding_size}).mode(torch::kConstant)
+
         );
 
         log->debug("Padded to {} ", tensor_clone.sizes()[0]);
@@ -127,10 +156,12 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     if (m_pad_wire_domain) {
         //This selects the post-roll block
         using namespace torch::indexing;
-        auto unpadded_width = shape[0] - (base_frer_spectrum->shape()[0]-1);
+        // auto unpadded_width = shape[0] - (base_frer_spectrum->shape()[0]-1);
+        // auto unpadded_width = shape[0] - (base_frer_spectrum->shape()[0]-1);
         tensor_clone = tensor_clone.index(
-            {Slice(None, unpadded_width)}
+            {Slice(None, original_nchans)}
         );
+        log->debug("Unpadded to {}", tensor_clone.sizes()[0]);
     }
 
     Configuration set_md, tensor_md;

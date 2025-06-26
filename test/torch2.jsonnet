@@ -377,6 +377,7 @@ local wc = import 'wirecell.jsonnet';
                     debug_no_roll: false,
                     debug_force_cpu: debug_force_cpu,
                     pad_wire_domain: (iplane > 1), #Non-periodic planes get padded
+                    use_fft_best_length: true,
                 },
             },
             nin=1, nout=1,
