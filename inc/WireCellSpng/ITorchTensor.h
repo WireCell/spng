@@ -13,6 +13,8 @@ class ITorchTensor : public IData<ITorchTensor> {
     virtual std::string dtype() const = 0;
     virtual std::vector<int64_t> shape() const = 0;
     virtual torch::Device device() const = 0;
+    //AB: Is this needed
+    //virtual const std::byte* data() const = 0;
 };
 }
 

@@ -9,7 +9,7 @@
 namespace WireCell::SPNG{
   class ITorchForward : public IComponent<ITorchForward> {
     public:
-      virtual ~ITorchForward();
+      virtual ~ITorchForward(){};
 
       virtual ITorchTensorSet::pointer forward(const ITorchTensorSet::pointer& input) const = 0;
   };

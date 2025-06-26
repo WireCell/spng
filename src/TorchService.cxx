@@ -78,30 +78,31 @@ void SPNG::TorchService::configure(const WireCell::Configuration& cfg)
     log->debug("loaded model \"{}\" to device \"{}\"",
                model_path, m_ctx.devname());
 }
-
+//TODO : Fix this function AB
 ITorchTensorSet::pointer SPNG::TorchService::forward(const ITorchTensorSet::pointer& in) const
 {
     ITorchTensorSet::pointer ret{nullptr};
     TorchSemaphore sem(m_ctx);
-    /*
+    
     log->debug("running model on device: \"{}\"", m_ctx.devname());
 
     torch::NoGradGuard no_grad;
-
+    //Finding Problem here....
     std::vector<torch::IValue> iival = SPNG::from_itensor(in, m_ctx.is_gpu());
 
     torch::IValue oival;
+    
     try {
         oival = m_module.forward(iival);
     }
     catch (const std::runtime_error& err) {
         log->error("error running model on device \"{}\": {}",
                    m_ctx.devname(), err.what());
-        return nullptr;
+        return ret;
     }
-
-    ITensorSet::pointer ret = SPNG::to_itensor({oival});
-    */
+    
+    //ret = SPNG::to_itensor({oival});
+    
     
     return ret;
 }
