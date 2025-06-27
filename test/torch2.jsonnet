@@ -383,6 +383,12 @@ local wc = import 'wirecell.jsonnet';
             nin=1, nout=1,
             uses=[torch_frer, the_wire_filter]),
 
+            local threshold_rois = g.pnode({
+                type: 'SPNGThresholdROIs',
+                name: 'spng_threshold_rois_apa%d_plane%d' % [anode.data.ident, iplane],
+            },
+            nin=1, nout=1, uses=[]),
+
             local the_wiener_tight = if iplane < 3 then wiener_tight_filters[iplane] else wiener_tight_filters[2],
             local the_torch_wiener_tight = if iplane < 3 then torch_wiener_tight_filters[iplane] else torch_wiener_tight_filters[2],
             local the_torch_wiener_wide = if iplane < 3 then torch_wiener_wide_filters[iplane] else torch_wiener_wide_filters[2],
@@ -641,7 +647,8 @@ local wc = import 'wirecell.jsonnet';
 
             local full_pipeline = (
                 decon_and_gaus + 
-                (if do_roi_filters then [post_gaus_filters] else []) // +
+                (if do_roi_filters then [post_gaus_filters] else [])
+                
             ),
 
             ret : g.pipeline(

@@ -46,27 +46,26 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
 bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& out) {
     out = nullptr;
     if (!in) {
-        //Why is this needed?
         log->debug("EOS ");
         return true;
     }
     log->debug("Running Decon");
 
-    //Get the cloned tensor from the input
-    size_t ntensors = in->tensors()->size();
-    log->debug("Got {} tensors", ntensors);
-    std::vector<int64_t> prev_shape = {-999, -999};
-    for (size_t i = 0; i < ntensors; ++i) {
-        auto this_sizes = in->tensors()->at(i)->tensor().sizes();
-        if (i == 0) {
-            prev_shape = this_sizes;
-        }
-        // if (prev_shape[0] != this_sizes[0] || prev_shape[1] != this_sizes[1]) {
-        //     log->debug("Size mismatch in tensors");
-        //     //TODO -- throw error
-        // }
-        log->debug("Tensor {} has shape {} {}", i, this_sizes[0], this_sizes[1]);
-    }
+    // //Get the cloned tensor from the input
+    // size_t ntensors = in->tensors()->size();
+    // log->debug("Got {} tensors", ntensors);
+    // std::vector<int64_t> prev_shape = {-999, -999};
+    // for (size_t i = 0; i < ntensors; ++i) {
+    //     auto this_sizes = in->tensors()->at(i)->tensor().sizes();
+    //     if (i == 0) {
+    //         prev_shape = this_sizes;
+    //     }
+    //     // if (prev_shape[0] != this_sizes[0] || prev_shape[1] != this_sizes[1]) {
+    //     //     log->debug("Size mismatch in tensors");
+    //     //     //TODO -- throw error
+    //     // }
+    //     log->debug("Tensor {} has shape {} {}", i, this_sizes[0], this_sizes[1]);
+    // }
 
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
     auto sizes = tensor_clone.sizes();
