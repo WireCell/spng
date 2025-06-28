@@ -119,6 +119,7 @@ namespace WireCell {
             //std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;
             int m_coarse_time_offset = 0;
             int m_save_count = 0;
+            bool m_is_gpu{false};
         };
     }
 }

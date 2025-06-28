@@ -5,6 +5,7 @@
 #include "WireCellIface/IData.h"
 #include "WireCellUtil/Configuration.h"
 
+
 namespace WireCell {
 class ITorchTensor : public IData<ITorchTensor> {
   public:
