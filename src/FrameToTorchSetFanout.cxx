@@ -20,6 +20,7 @@ WireCell::Configuration SPNG::FrameToTorchSetFanout::default_configuration() con
     Configuration cfg;
     cfg["anode"] = m_anode_tn;
     cfg["debug_force_cpu"] = m_debug_force_cpu;
+    cfg["unsqueeze_output"] = m_unsqueeze_output;
     return cfg;
 }
 
@@ -30,7 +31,7 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
     m_anode = Factory::find_tn<IAnodePlane>(m_anode_tn);
 
     m_debug_force_cpu = get(config, "debug_force_cpu", m_debug_force_cpu);
-
+    m_unsqueeze_output = get(config, "unsqueeze_output", m_unsqueeze_output);
 
     m_expected_nticks = get(config, "expected_nticks", m_expected_nticks);
     log->debug("Got {}", m_expected_nticks);
@@ -177,6 +178,10 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         // TODO: set md
         Configuration set_md;
         set_md["period"] = in->tick();
+
+        if (m_unsqueeze_output) {
+            tensors[output_index] = torch::unsqueeze(tensors[output_index], 0);
+        }
 
         //Clone the tensor to take ownership of the memory and put into 
         //output 

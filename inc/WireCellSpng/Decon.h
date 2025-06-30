@@ -28,6 +28,7 @@ namespace SPNG {
         std::string m_wire_filter{"Torch1DSpectrum"};
         std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;
         int m_coarse_time_offset = 0;
+        bool m_unsqueeze_input = false;
         bool m_debug_no_frer = false;
         bool m_debug_no_wire_filter = false;
         bool m_debug_no_roll = false;

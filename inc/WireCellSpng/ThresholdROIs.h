@@ -25,6 +25,7 @@ namespace SPNG {
         };
     private:
         bool m_debug_force_cpu{false};
+        bool m_unsqueeze_input = false;
         Json::Value m_output_set_tag{"ThresholdROIs"}, m_output_tensor_tag{"Default"};
     };
 }

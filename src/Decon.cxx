@@ -37,6 +37,8 @@ void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
     m_debug_no_wire_filter = get(config, "debug_no_wire_filter", m_debug_no_wire_filter);
     m_debug_no_roll = get(config, "debug_no_roll", m_debug_no_roll);
 
+    m_unsqueeze_input = get(config, "unsqueeze_input", m_unsqueeze_input);
+
     m_output_set_tag = get(config, "output_set_tag", m_output_set_tag);
     m_output_tensor_tag = get(config, "output_tensor_tag", m_output_tensor_tag);
     log->debug("Will tag with Set:{} Tensor:{}", m_output_set_tag.asString(),
@@ -68,13 +70,18 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     // }
 
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
+    
+    if (m_unsqueeze_input)
+        tensor_clone = torch::unsqueeze(tensor_clone, 0);
+
     auto sizes = tensor_clone.sizes();
     std::vector<int64_t> shape;
     for (const auto & s : sizes) {
         shape.push_back(s);
     }
+    std::vector<int64_t> response_shape(shape.begin()+1, shape.end());
 
-    int64_t original_nchans = shape[0];
+    int64_t original_nchans = shape[1];
 
     
     // TODO -- Padding in time domain then trim
@@ -105,20 +112,20 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
 
         );
 
-        log->debug("Padded to {} ", tensor_clone.sizes()[0]);
-        shape[0] = tensor_clone.sizes()[0];
+        log->debug("Padded to {} ", tensor_clone.sizes()[1]);
+        response_shape[0] = tensor_clone.sizes()[1];
     }
 
 
 
     //FFT on time dim
-    tensor_clone = torch::fft::rfft(tensor_clone, std::nullopt, 1);
+    tensor_clone = torch::fft::rfft(tensor_clone, std::nullopt, 2);
 
     //FFT on chan dim
-    tensor_clone = torch::fft::fft(tensor_clone, std::nullopt, 0);
+    tensor_clone = torch::fft::fft(tensor_clone, std::nullopt, 1);
 
     //Get the Field x Elec. Response and do FFT in both dimensons
-    auto frer_spectrum_tensor = base_frer_spectrum->spectrum(shape).clone();
+    auto frer_spectrum_tensor = base_frer_spectrum->spectrum(response_shape).clone();
     frer_spectrum_tensor = torch::fft::rfft2(frer_spectrum_tensor);
 
     //Get the wire shift
@@ -131,7 +138,7 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
 
     //Get the Wire filter -- already FFT'd
     //TODO -- fix the log here because of HfFilter weirdness
-    auto wire_filter_tensor = base_wire_filter->spectrum({shape[0]});
+    auto wire_filter_tensor = base_wire_filter->spectrum({response_shape[0]});
 
     //Multiply along the wire dimension
     if (!m_debug_no_wire_filter)
@@ -145,11 +152,11 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         (m_coarse_time_offset + base_frer_spectrum->shifts()[1]) /
         in->metadata()["period"].asDouble()
     );
-    
+
     if (!m_debug_no_roll) {
         //Shift along wire dimension
-        tensor_clone = tensor_clone.roll(wire_shift, 0);
-        tensor_clone = tensor_clone.roll(time_shift, 1);
+        tensor_clone = tensor_clone.roll(wire_shift, 1);
+        tensor_clone = tensor_clone.roll(time_shift, 2);
     }
 
     if (m_pad_wire_domain) {
@@ -157,12 +164,16 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         using namespace torch::indexing;
         // auto unpadded_width = shape[0] - (base_frer_spectrum->shape()[0]-1);
         // auto unpadded_width = shape[0] - (base_frer_spectrum->shape()[0]-1);
-        tensor_clone = tensor_clone.index(
-            {Slice(None, original_nchans)}
-        );
-        log->debug("Unpadded to {}", tensor_clone.sizes()[0]);
+        tensor_clone = tensor_clone.index({
+            Slice(), //Over all of the planes
+            Slice(None, original_nchans) //0 to N orig channels
+        });
+        log->debug("Unpadded to {}", tensor_clone.sizes()[1]);
     }
 
+    if (m_unsqueeze_input)
+        torch::squeeze(tensor_clone, 0);
+    
     Configuration set_md, tensor_md;
 
     tensor_md["tag"] = m_output_tensor_tag;

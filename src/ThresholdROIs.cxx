@@ -24,6 +24,7 @@ void WireCell::SPNG::ThresholdROIs::configure(const WireCell::Configuration& con
 
     m_output_set_tag = get(config, "output_set_tag", m_output_set_tag);
     m_output_tensor_tag = get(config, "output_tensor_tag", m_output_tensor_tag);
+    m_unsqueeze_input = get(config, "unsqueeze_input", m_unsqueeze_input);
     log->debug("Will tag with Set:{} Tensor:{}", m_output_set_tag.asString(),
                m_output_tensor_tag.asString());
 }
@@ -53,7 +54,10 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
     // }
 
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
-    tensor_clone = torch::unsqueeze(tensor_clone, 0);
+
+    if (m_unsqueeze_input)
+        tensor_clone = torch::unsqueeze(tensor_clone, 0);
+
     auto sizes = tensor_clone.sizes();
     // std::vector<int64_t> shape;
     for (const auto & s : sizes) {
@@ -85,7 +89,8 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
     }
     tensor_clone = torch::where(tensor_clone > 3*rms_vals, tensor_clone, torch::zeros({1}).to(device));
 
-    tensor_clone = torch::squeeze(tensor_clone, 0);
+    if (m_unsqueeze_input)
+        tensor_clone = torch::squeeze(tensor_clone, 0);
 
 
     Configuration set_md, tensor_md;

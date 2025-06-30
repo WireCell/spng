@@ -41,6 +41,9 @@ namespace WireCell {
             std::unordered_map<int, int> m_channel_map;
             std::unordered_map<int, int> m_channel_to_output_group;
 
+            //Expand dimensionality on output
+            bool m_unsqueeze_output{false};
+
             std::string m_anode_tn{"AnodePlane"};
             IAnodePlane::pointer m_anode;
             //Expected number of ticks in each readout frame
