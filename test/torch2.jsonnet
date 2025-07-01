@@ -4,8 +4,8 @@ local g = import 'pgraph.jsonnet';
 local wc = import 'wirecell.jsonnet';
 local spng_filters = import 'spng_filters.jsonnet';
 
-{
-    make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
+function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
+    // make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
 
         local filter_settings = {
             debug_force_cpu: debug_force_cpu,
@@ -71,6 +71,7 @@ local spng_filters = import 'spng_filters.jsonnet';
                 data: {multiplicity: (if iplane > 1 then 2 else 6)}
             }, nin=1, nout=(if iplane > 1 then 2 else 6), uses=[anode])
         }.ret,
+
         local make_pipeline(anode, iplane, apply_gaus=true, do_roi_filters=false) = {
             local the_field = if std.length(tools.fields) > 1 then tools.fields[anode.data.ident] else tools.fields[0],
             local torch_frer = {
@@ -437,10 +438,210 @@ local spng_filters = import 'spng_filters.jsonnet';
             ),
         }.ret,
         
-        ret : [
+        spng_decons : [
             spng_fanout(anode, apply_gaus=apply_gaus, do_roi_filters=do_roi_filters, do_collate_apa=do_collate_apa) for anode in tools.anodes
         ],
-    }.ret,
+   
+        stacked_spng : {
+            local tf_fans = [make_fanout(anode) for anode in tools.anodes],
 
+            local u_stacker =  g.pnode({
+                type: 'TorchTensorSetStacker',
+                name: 'u_stacker',
+                data: {
+                    output_set_tag: 'u_stacked',
+                    multiplicity:4,
+                },
+            }, nin=4, nout=1),
+            local v_stacker =  g.pnode({
+                type: 'TorchTensorSetStacker',
+                name: 'v_stacker',
+                data: {
+                    output_set_tag: 'v_stacked',
+                    multiplicity:4,
+                },
+            }, nin=4, nout=1),
+            local w_stacker =  g.pnode({
+                type: 'TorchTensorSetStacker',
+                name: 'w_stacker',
+                data: {
+                    output_set_tag: 'w_stacked',
+                    multiplicity:8,
+                },
+            }, nin=8, nout=1),
 
+            local torch_to_tensors = [
+                g.pnode({
+                    type: 'TorchToTensor',
+                    name: 'torchtotensor_%s' % [i],
+                    data: {},
+                }, nin=1, nout=1) for i in ['u', 'v', 'w']
+            ],
+
+            local tensor_sinks = [g.pnode({
+                type: 'TensorFileSink',
+                name: 'tfsink_%s' % i,
+                data: {
+                    outname: 'testout_fan_plane_%s.tar' % i,
+                    prefix: ''
+                },
+            }, nin=1, nout=0) for i in ['u', 'v', 'w']],
+
+            local torch_roi_loose_spectra = [{
+                    type: "Torch1DSpectrum",
+                    name: "torch_1dspec_roi_loose_%d" % iplane,
+                    uses: [filters.wiener_tight_filters[iplane], filters.ROI_loose_lf],
+                    data: {
+                        spectra: [
+                            wc.tn(filters.wiener_tight_filters[iplane]),
+                            wc.tn(filters.ROI_loose_lf),
+                            // wc.tn(filters.ROI_tight_lf),
+                        ],
+                        debug_force_cpu: debug_force_cpu,
+                    },
+            } for iplane in std.range(0,2)],
+
+            local apply_loose_rois = [g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_loose_roi_plane%d' % iplane,
+                data: {
+                    base_spectrum_name: wc.tn(torch_roi_loose_spectra[iplane]),
+                    dimension: 2,
+                    // target_tensor: 'HfGausWide',
+                    output_set_tag: 'ROILoose',
+                },
+            },
+            nin=1, nout=1,
+            uses=[torch_roi_loose_spectra[iplane]]) for iplane in std.range(0,2)],
+            
+
+            local fans_to_stacks = g.intern(
+                innodes=tf_fans,
+                centernodes=[],
+                outnodes=[u_stacker, v_stacker, w_stacker],
+                edges=[
+
+                    g.edge(tf_fans[0], u_stacker, 0, 0),
+                    g.edge(tf_fans[0], v_stacker, 1, 0),
+                    g.edge(tf_fans[0], w_stacker, 2, 0),
+                    g.edge(tf_fans[0], w_stacker, 3, 1),
+
+                    g.edge(tf_fans[1], u_stacker, 0, 1),
+                    g.edge(tf_fans[1], v_stacker, 1, 1),
+                    g.edge(tf_fans[1], w_stacker, 2, 2),
+                    g.edge(tf_fans[1], w_stacker, 3, 3),
+
+                    g.edge(tf_fans[2], u_stacker, 0, 2),
+                    g.edge(tf_fans[2], v_stacker, 1, 2),
+                    g.edge(tf_fans[2], w_stacker, 2, 4),
+                    g.edge(tf_fans[2], w_stacker, 3, 5),
+
+                    g.edge(tf_fans[3], u_stacker, 0, 3),
+                    g.edge(tf_fans[3], v_stacker, 1, 3),
+                    g.edge(tf_fans[3], w_stacker, 2, 6),
+                    g.edge(tf_fans[3], w_stacker, 3, 7),
+
+                ]
+            ),
+
+            local the_field = tools.fields[0],
+
+            local torch_frers = [{
+                type: "TorchFRERSpectrum",
+                name: "torch_frer_plane%d" % iplane,
+                uses: [
+                    the_field,
+                    tools.elec_resp
+                ],
+                data: {
+                    field_response: wc.tn(the_field),#"FieldResponse:field%d"% anode.data.ident,
+                    fr_plane_id: if iplane > 2 then 2 else iplane,
+                    ADC_mV: 11702142857.142859,
+                    inter_gain: 1.0,
+                    default_nchans : nchans[iplane],
+                    default_nticks: 6000,
+                    default_period: 500.0, #512.0,
+                    extra_scale: 1.0,
+                    anode_num: 0,
+                    debug_force_cpu: debug_force_cpu,
+
+                }
+            } for iplane in std.range(0, 2)],
+            // local the_wire_filters = [if iplane > 1 then filters.torch_wire_filters[1] else filters.torch_wire_filters[0],
+
+            local spng_decons = [
+                g.pnode({
+                    type: 'SPNGDecon',
+                    name: 'spng_decon__plane%d' % iplane,
+                    data: {
+                        frer_spectrum: wc.tn(torch_frers[iplane]),
+                        wire_filter: wc.tn(if iplane < 2 then filters.torch_wire_filters[0] else filters.torch_wire_filters[1]),
+                        coarse_time_offset: 1000,
+                        debug_no_frer: false,
+                        debug_no_wire_filter: false,
+                        debug_no_roll: false,
+                        debug_force_cpu: debug_force_cpu,
+                        pad_wire_domain: (iplane > 1), #Non-periodic planes get padded
+                        use_fft_best_length: true,
+                        unsqueeze_input: false,
+                    },
+                },
+                nin=1, nout=1,
+                uses=[torch_frers[iplane], if iplane < 2 then filters.torch_wire_filters[0] else filters.torch_wire_filters[1]])
+                for iplane in std.range(0, 2)
+            ],
+
+            local spng_gaus_apps = [g.pnode({
+                type: 'SPNGApply1DSpectrum',
+                name: 'spng_gaus_plane%d' % iplane,
+                data: {
+                    base_spectrum_name: wc.tn(filters.torch_gaus_filter), #put in if statement
+                    dimension: 2,
+                    // target_tensor: "Default",
+                    output_set_tag: "HfGausWide",
+                },
+            },
+            nin=1, nout=1,
+            uses=[filters.torch_gaus_filter]) for iplane in std.range(0,2)],
+
+            local threshold_rois = [g.pnode({
+                type: 'SPNGThresholdROIs',
+                name: 'spng_threshold_rois_plane%d' % iplane,
+                data: {
+                    unsqueeze_input: false,
+                }
+            },
+            nin=1, nout=1, uses=[]) for iplane in std.range(0,2)],
+            
+            ret : g.intern(
+                innodes=[fans_to_stacks],
+                centernodes=torch_to_tensors + spng_decons + spng_gaus_apps + apply_loose_rois + threshold_rois,
+                outnodes=tensor_sinks,
+                edges = [
+                    g.edge(fans_to_stacks, spng_decons[0], 0),
+                    g.edge(fans_to_stacks, spng_decons[1], 1),
+                    g.edge(fans_to_stacks, spng_decons[2], 2),
+
+                    g.edge(spng_decons[0], spng_gaus_apps[0]),
+                    g.edge(spng_decons[1], spng_gaus_apps[1]),
+                    g.edge(spng_decons[2], spng_gaus_apps[2]),
+
+                    g.edge(spng_gaus_apps[0], apply_loose_rois[0]),
+                    g.edge(spng_gaus_apps[1], apply_loose_rois[1]),
+                    g.edge(spng_gaus_apps[2], apply_loose_rois[2]),
+
+                    g.edge(apply_loose_rois[0], threshold_rois[0]),
+                    g.edge(apply_loose_rois[1], threshold_rois[1]),
+                    g.edge(apply_loose_rois[2], threshold_rois[2]),
+
+                    g.edge(threshold_rois[0], torch_to_tensors[0]),
+                    g.edge(threshold_rois[1], torch_to_tensors[1]),
+                    g.edge(threshold_rois[2], torch_to_tensors[2]),
+
+                    g.edge(torch_to_tensors[0], tensor_sinks[0]),
+                    g.edge(torch_to_tensors[1], tensor_sinks[1]),
+                    g.edge(torch_to_tensors[2], tensor_sinks[2]),
+                ],
+            ),
+        }.ret,
 }

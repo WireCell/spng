@@ -116,15 +116,16 @@ local parallel_graph = f.fanpipe('FrameFanout', parallel_pipes, 'FrameFanin', 's
 local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fanout_apa_rules);
 
 
-local tf_maker = import 'torch2.jsonnet';
-local spng_decons = tf_maker.make_spng(
+local torch_maker = import 'torch2.jsonnet';
+local torch_nodes = torch_maker(
   tools,
   debug_force_cpu=false,
   apply_gaus=(std.extVar("ApplyGaus") == 1),
   do_roi_filters=(std.extVar("ROI") == 1),
   do_collate_apa=(std.extVar("CollateAPAs") == 1),
 );
-
+local spng_decons = torch_nodes.spng_decons;
+local spng_stacked = torch_nodes.stacked_spng;
 
 local load_to_fanout = g.intern(
   innodes=[frame_input],
@@ -136,20 +137,35 @@ local load_to_fanout = g.intern(
 
 local sink = sim.frame_sink;
 
-local graph = if std.extVar("SPNG") == 0 then
-  g.pipeline([frame_input, parallel_graph, sink])
+local spng_flag = std.extVar("SPNG");
 
-  else g.intern(
-    innodes=[load_to_fanout],
-    outnodes=spng_decons,
-    centernodes=[],
-    edges = [
-      g.edge(load_to_fanout, spng_decons[0], 0),
-      g.edge(load_to_fanout, spng_decons[1], 1),
-      g.edge(load_to_fanout, spng_decons[2], 2),
-      g.edge(load_to_fanout, spng_decons[3], 3),
-    ]
-  );
+local graph = if (spng_flag == 0) then
+    g.pipeline([frame_input, parallel_graph, sink])
+
+  else if (spng_flag == 1) then
+    g.intern(
+      innodes=[load_to_fanout],
+      outnodes=spng_decons,
+      centernodes=[],
+      edges = [
+        g.edge(load_to_fanout, spng_decons[0], 0),
+        g.edge(load_to_fanout, spng_decons[1], 1),
+        g.edge(load_to_fanout, spng_decons[2], 2),
+        g.edge(load_to_fanout, spng_decons[3], 3),
+      ]
+    )
+
+  else if (spng_flag == 2) then
+    g.intern(
+      innodes=[load_to_fanout],
+      outnodes=[spng_stacked],
+      edges = [
+        g.edge(load_to_fanout, spng_stacked, 0, 0),
+        g.edge(load_to_fanout, spng_stacked, 1, 1),
+        g.edge(load_to_fanout, spng_stacked, 2, 2),
+        g.edge(load_to_fanout, spng_stacked, 3, 3),
+      ]
+    );
 
 local app = {
   type: 'Pgrapher',
