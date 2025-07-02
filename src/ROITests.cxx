@@ -8,6 +8,29 @@
 #include "WireCellIface/ITrace.h"
 #include "WireCellAux/PlaneTools.h"
 
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <tuple>
+
+//read the tag to get the apa, filter-name and filter-type information
+std::tuple<int, std::string, std::string> parseTag(const std::string& tag) {
+    std::istringstream ss(tag);
+    std::string segment;
+    std::string segments[3];
+    int i = 0;
+
+    while (std::getline(ss, segment, ':') && i < 3) {
+        segments[i++] = segment;
+    }
+
+    int plane = -1;
+    if (segments[0].find("collated_") == 0) {
+        plane = std::stoi(segments[0].substr(9));  // "collated_" is 9 chars
+    }
+
+    return {plane, segments[1], segments[2]};
+}
 
 //register this (ROITests) as a factory
 WIRECELL_FACTORY(SPNGROITests,// name of the factory
@@ -20,6 +43,9 @@ WIRECELL_FACTORY(SPNGROITests,// name of the factory
 
 using namespace WireCell;
 using namespace WireCell::SPNG;
+
+
+
 
 //First step. Get the output of the Collator here as input. 
 ROITests::ROITests()
@@ -34,7 +60,7 @@ void ROITests::configure(const WireCell::Configuration& cfg)
 {
    m_cfg.apa = get(cfg, "apa",m_cfg.apa);
    m_cfg.plane = get(cfg, "plane", m_cfg.plane); 
-
+   log->debug("ROITests: Configuring with apa: {}, plane: {}", m_cfg.apa, m_cfg.plane);
    // Is it implemented already>
    /*
    auto apa = Factory::find_tn<IAnodePlane>(m_cfg.apa);
@@ -64,14 +90,33 @@ void ROITests::configure(const WireCell::Configuration& cfg)
    m_is_gpu = get(cfg, "is_gpu", m_is_gpu);
 
    //TODO AB: Other configuration parameters that needs to be forwarded to the TorchService
-   
-
+  // m_forward = Factory::find_tn<ITorchForward>(m_cfg.forward);
+   try{
+    m_forward = Factory::find_tn<ITorchForward>(m_cfg.forward);
+   }
+   catch (const std::exception& e) {
+       log->debug("ROITests: Failed to find TorchService instance with name: {}", m_cfg.forward);
+       THROW(ValueError() << errmsg{"Failed to find TorchService instance"});
+   }
 }
 
 void ROITests::finalize()
 {
 
 }
+
+std::string tensor_shape_string(const at::Tensor& t) {
+    std::ostringstream oss;
+    oss << "[";
+    for (size_t i = 0; i < t.sizes().size(); ++i) {
+        oss << t.sizes()[i];
+        if (i != t.sizes().size() - 1)
+            oss << ", ";
+    }
+    oss << "]";
+    return oss.str();
+}
+
 
 bool ROITests::operator()(const input_pointer& in, output_pointer& out)
 {
@@ -91,20 +136,23 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
     }
     //TimeKeeper tk(fmt::format("call={}",m_save_count));
     //Process Each TorchTensors in input set to torch::Tensor
-    std::vector<torch::Tensor> ch_tensors;
+    //std::vector<torch::Tensor> ch_tensors; //induction planes
+    ROIData ch_tensors; //induction planes
+    ROIData coll_tensors; //collection planes
+    //save the metadata tags from the input tensors
     log->debug("ROITests: Processing {} tensors", tensors->size());
     for (size_t i = 0; i < tensors->size(); ++i) {
         auto tensor = tensors->at(i)->tensor();
         // process tensor to torch_tensor to write to ch_tensors
-        
 
         // Check the tensor tags (metadata)
         auto metadata = tensors->at(i)->metadata();
-        if (metadata.isMember("tag")) {
+        if (metadata.isMember("tag") && !metadata["tag"].asString().empty()) {
             log->debug("ROITests: Found tag in metadata: {}", metadata["tag"].asString());
         } else {
             log->warn("ROITests: No tag found in metadata for tensor {}", i);
         }
+
         torch::Tensor scaled = tensor*m_cfg.input_scale + m_cfg.input_offset;
         //  ch_eigen.push_back(Array::downsample(arr, m_cfg.tick_per_slice, 1));
         auto tick_per_slice = m_cfg.tick_per_slice;
@@ -120,28 +168,36 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
         auto downsampled = reshaped.mean(2);
         //now cscale and offset the downsampled tensor
         auto dscaled = downsampled * m_cfg.input_scale + m_cfg.input_offset;
-        ch_tensors.push_back(dscaled);
-
+        auto nchannels = dscaled.size(0); //number of channels 
+        if(nchannels == 800){
+            ch_tensors.tensors.push_back(dscaled); //induction plane
+            ch_tensors.r_tags.push_back(metadata["tag"].asString()); //store the tag
+        }
+        else {
+            coll_tensors.tensors.push_back(dscaled); //collection plane
+            coll_tensors.r_tags.push_back(metadata["tag"].asString()); //store the tag
+        }
     }
+    for (size_t i = 0; i < ch_tensors.tensors.size(); ++i) {
+        log->debug("ROITests: Tensor {} shape: {} tags: {} ", i, tensor_shape_string(ch_tensors.tensors[i]),ch_tensors.r_tags[i]);
+    }
+    
     //stack vector of tensors along a new dimension (0)
-    auto img = torch::stack(ch_tensors, 0); //stack all the tensors along a new dimension (0)
+    auto img = torch::stack(ch_tensors.tensors, 0); //stack all the tensors along a new dimension (0)
     //img is now a 3D stacked tensors 
     auto transposed = img.transpose(1,2); //transposition into ntags, nticks_ds, nchannels
-
     auto batch = torch::unsqueeze(transposed, 0); //add a batch dimension at the start
-    
-
     auto chunks = batch.chunk(m_cfg.nchunks, 2); // chunk the batch into m_cfg.nchunks along the time dimension (2)
-    //print the shape of a chunk
-    log->debug("ROITests: Chunk shape: {}", chunks[0].sizes()[1]);
-
     std::vector<torch::Tensor> outputs;
-    
     for (auto& chunk : chunks) {
-        log->debug("ROITests: Chunk shape: {}", chunk.sizes()[1]);
+        log->debug("ROITests: Chunk shape: {}, nchunks {}", chunk.sizes()[1], m_cfg.nchunks);
         std::vector<torch::IValue> inputs = {chunk};
-        auto iitens = to_itensor(inputs); // convert inputs to ITorchTensorSet
+        log->debug("ROITests: Chunk shape: {}", tensor_shape_string(chunk));
+        auto iitens = to_itensor(inputs); // convert inputs to ITorchTensorSet        
+        log->debug("ROITests: ITorchTensorSet shape: {}", tensor_shape_string(iitens->tensors()->at(0)->tensor()));
+        log->debug("ROITests: Forwarding chunk with shape: {} from inputs of shape {}", tensor_shape_string(iitens->tensors()->at(0)->tensor()),tensor_shape_string(chunk));
         auto oitens = m_forward->forward(iitens);
+        log->debug("ROITests: Output chunk shape: {}", tensor_shape_string(oitens->tensors()->at(0)->tensor()));
         //torch::Tensor out_chunk = oitens.toTensor().to(torch::kCUDA); // keep the data in gpu if needed for other stuff.
         torch::Tensor out_chunk = from_itensor(oitens, m_is_gpu)[0].toTensor().cpu(); // convert ITorchTensorSet to torch::Tensor
         outputs.push_back(out_chunk);

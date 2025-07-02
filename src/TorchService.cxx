@@ -20,22 +20,7 @@ using namespace WireCell;
 SPNG::TorchService::TorchService()
     : Aux::Logger("TorchService", "torch")
 {
-    //TODO: Need to rewrite for whatever we plan for SPNG
-    /*
-  // set the number of threads to OMP_NUM_THREADS
-  const char* env_var = std::getenv("OMP_NUM_THREADS");
-  if (env_var != NULL) {
-    std::string env_str(env_var);
-    try {
-      int nthread = std::stoi(env_str);
-      omp_set_num_threads(nthread);
-    }
-    catch(...) {
-      log->critical("error interpreting OMP_NUM_THREADS as integer ({})", env_str);
-    } // env var not set
-  }
-  log->info("TorchService parallel info:\n{}",  at::get_parallel_info());
-  */
+
 }
 
 Configuration SPNG::TorchService::default_configuration() const
@@ -47,14 +32,15 @@ Configuration SPNG::TorchService::default_configuration() const
 
     // one of: {cpu, gpu, gpuN} where "N" is a GPU number.  "gpu"
     // alone will use GPU 0.
-    cfg["device"] = "cpu";
+    cfg["device"] = "gpu";
     
     return cfg;
 }
 
 void SPNG::TorchService::configure(const WireCell::Configuration& cfg)
 {
-    auto dev = get<std::string>(cfg, "device", "cpu");
+    //Should be gpus
+    auto dev = get<std::string>(cfg, "device", "gpu");
     m_ctx.connect(dev);
 
     auto model_path = Persist::resolve(cfg["model"].asString());
@@ -64,7 +50,7 @@ void SPNG::TorchService::configure(const WireCell::Configuration& cfg)
     }
 
     // Use almost 1/2 the memory and 3/4 the time.
-    torch::NoGradGuard no_grad;
+    // torch::NoGradGuard no_grad; //Why is this here?
 
     try {
         m_module = torch::jit::load(model_path, m_ctx.device());
@@ -78,31 +64,39 @@ void SPNG::TorchService::configure(const WireCell::Configuration& cfg)
     log->debug("loaded model \"{}\" to device \"{}\"",
                model_path, m_ctx.devname());
 }
-//TODO : Fix this function AB
+
 ITorchTensorSet::pointer SPNG::TorchService::forward(const ITorchTensorSet::pointer& in) const
 {
-    ITorchTensorSet::pointer ret{nullptr};
-    TorchSemaphore sem(m_ctx);
-    
-    log->debug("running model on device: \"{}\"", m_ctx.devname());
+    log->debug("TorchService::forward function entered");
 
-    torch::NoGradGuard no_grad;
-    //Finding Problem here....
+    if (!in) {
+        log->critical("TorchService::forward received a null input pointer");
+        THROW(ValueError() << errmsg{"TorchService::forward received a null input pointer"});
+    }
+
+    try {
+        log->debug("TorchService::forward called with input: {}", in->ident());
+    }
+    catch (const std::exception& e) {
+        log->critical("Exception while accessing in->ident(): {}", e.what());
+        THROW(ValueError() << errmsg{"Exception while accessing in->ident()"} <<
+                            errmsg{" " + std::string(e.what())});
+    }
+
+
     std::vector<torch::IValue> iival = SPNG::from_itensor(in, m_ctx.is_gpu());
 
     torch::IValue oival;
-    
+
     try {
         oival = m_module.forward(iival);
     }
     catch (const std::runtime_error& err) {
-        log->error("error running model on device \"{}\": {}",
-                   m_ctx.devname(), err.what());
-        return ret;
+        log->critical("Error running model on device: {}", err.what());
+        THROW(ValueError() << errmsg{"error running model on device"} <<
+                            errmsg{" " + std::string(err.what())});
     }
-    
-    //ret = SPNG::to_itensor({oival});
-    
-    
+
+    ITorchTensorSet::pointer ret = SPNG::to_itensor({oival});
     return ret;
 }

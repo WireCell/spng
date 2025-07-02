@@ -17,7 +17,7 @@ namespace WireCell {
 
             // The plane index number (in 0,1,2) to determine which
             // channels span the data.
-            int plane{0};
+            int plane{-1};
 
             // If true, sort the selected channels by their channel ID
             // value.  If false, the ordering given by the channel
@@ -27,7 +27,7 @@ namespace WireCell {
 
             // DNN needs consistent scaling with trained model.  This is
             // multiplied to the input charge values.
-            double input_scale{1.0 / 4000};
+            double input_scale{1.0 / 8000};
 
             // Charge offset added to input charge values.
             double input_offset{0.0};
@@ -87,6 +87,10 @@ namespace WireCell {
             bool save_negative_charge{false};
         };
 
+        struct ROIData{
+            std::vector<std::string> r_tags;
+            std::vector<torch::Tensor> tensors;
+        };
 
         class ROITests : public Aux::Logger, 
                       public ITorchTensorSetFilter,                      
@@ -120,6 +124,7 @@ namespace WireCell {
             int m_coarse_time_offset = 0;
             int m_save_count = 0;
             bool m_is_gpu{false};
+
         };
     }
 }
