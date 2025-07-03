@@ -7,12 +7,18 @@
  * computations suitable for both CPU and GPU execution.
  *
  * Major changes from the original:
+ *
+ * - The data model is fully 2D and there is no concept of a 3rd "drift"
+ *   direction.
+ *
  * - All std::vector, boost::multi_array, and custom Vector classes are replaced
- * with torch::Tensor.
+ *   with torch::Tensor.
+ * 
  * - Calculations are designed to be performed in batches, eliminating slow,
- * iterative loops.
- * - The main Coordinates class is initialized with a torch::Device to specify
- * whether computations should occur on the CPU or a CUDA-enabled GPU.
+ *   iterative loops.
+ *
+ * - The main Coordinates class provides a convention .to(device) method to move
+ *   its data to a given device.
  */
 
 #ifndef WIRECELL_TORCHRAYGRID_H
@@ -21,84 +27,128 @@
 #include <torch/torch.h>
 #include <vector>
 #include <utility>
+#include <cmath>                // for pi
 
 namespace WireCell {
+namespace Spng {
 namespace TorchRayGrid {
 
-    // A ray is identified by its layer and grid indices.
-    // This remains a simple struct for clarity.
-    struct coordinate_t {
-        int layer;
-        int grid;
-    };
-
-    // A crossing is identified by the coordinates of two intersecting rays.
-    typedef std::pair<coordinate_t, coordinate_t> crossing_t;
-    typedef std::vector<crossing_t> crossings_t;
-
-    /**
-     * @class Coordinates
-     * @brief Manages the geometric relationships between layers in the tomographic setup.
+    /** Ray grid taxonomy
      *
-     * This class pre-computes various geometric quantities and stores them as tensors.
-     * These tensors allow for extremely fast, batched calculation of ray crossings
-     * and pitch locations, which are fundamental operations for the reconstruction.
+     * As this code uses torch tensors for all data there are no special C++
+     * types to describe various taxons as in original RayGrid.  They are
+     * described here:
+     *
+     * ray - a segment of a conceptually infinite line.  When ray grid describes
+     * LArTPC wires/strips, a ray is the lower bounds of the region centered on
+     * the electrode.
+     *
+     * coordinate - a pair of indices giving the "layer" and the (1D) "grid"
+     * location of a ray.
+     *
+     * crossing - a pair of ray grid coordinates specifying rays in different
+     * views.
+     *
+     * crossing point - a point in the mother 3D Cartesian space at a crossing.
      */
+
     class Coordinates {
     public:
-        /**
-         * @brief Constructs a Coordinates object.
-         * @param rays A tensor defining the seed rays for each layer.
-         * Shape: [nlayers, 2 (rays per pair), 2 (points per ray), 2 (x,y coords)].
-         * It's assumed the rays have been projected onto a 2D plane.
-         * @param device The torch::Device (e.g., torch::kCPU or torch::kCUDA) on which
-         * to perform computations.
-         */
-        Coordinates(const torch::Tensor& rays, const torch::Device& device);
+        // Constructor
+        Coordinates(const torch::Tensor& views);
 
-        /**
-         * @brief Calculates the crossing point of a batch of ray pairs.
-         * @param crossings A Long tensor identifying the pairs of rays.
-         * Shape: [N, 2 (rays per crossing), 2 (layer, grid)].
-         * @return A tensor of crossing point coordinates. Shape: [N, 2 (x,y)].
-         */
-        torch::Tensor ray_crossing_batch(const torch::Tensor& crossings) const;
-
-        /**
-         * @brief Calculates the location of ray crossings projected onto a third layer's pitch axis.
-         * @param crossings A Long tensor identifying the pairs of rays forming the crossings.
-         * Shape: [N, 2, 2], with the last dimension being (layer, grid).
-         * @param other_layers A Long tensor of the layer indices onto which to project.
-         * Shape: [N].
-         * @return A tensor of pitch locations. Shape: [N].
-         */
-        torch::Tensor pitch_location_batch(const torch::Tensor& crossings, const torch::Tensor& other_layers) const;
-
-        // Accessors for geometric tensors
-        int nlayers() const { return m_nlayers; }
-        const torch::Device& device() const { return m_device; }
-        const torch::Tensor& pitch_mags() const { return m_pitch_mag; }
-        const torch::Tensor& pitch_dirs() const { return m_pitch_dir; }
-        const torch::Tensor& centers() const { return m_center; }
-        const torch::Tensor& ray_jumps() const { return m_ray_jump; }
-        const torch::Tensor& a() const { return m_a; }
-        const torch::Tensor& b() const { return m_b; }
-
+        /// Return ray crossings.  This comes in three flavors: scalar, hybrid
+        /// scalar/batched and full batched.
+        torch::Tensor ray_crossing(int64_t view1, int64_t ray1,
+                                   int64_t view2, int64_t ray2) const;
+        torch::Tensor ray_crossing(int64_t view1, const torch::Tensor& ray1,
+                                   int64_t view2, const torch::Tensor& ray2) const;
+        torch::Tensor ray_crossing(const torch::Tensor& view1, 
+                                   const torch::Tensor& ray1,
+                                   const torch::Tensor& view2,
+                                   const torch::Tensor& ray2) const;
+        
+        /// Return pitch locations.  This comes in three flavors: scalar, hybrid
+        /// scalar/batched and full batched.
+        torch::Tensor pitch_location(int64_t view1, int64_t ray1,
+                                     int64_t view2, int64_t ray2,
+                                     int64_t view_idx) const;
+        torch::Tensor pitch_location(int64_t view1, const torch::Tensor& ray1,
+                                     int64_t view2, const torch::Tensor& ray2,
+                                     int64_t view_idx) const;
+        torch::Tensor pitch_location(const torch::Tensor& view1, const torch::Tensor& ray1,
+                                     const torch::Tensor& view2, const torch::Tensor& ray2,
+                                     const torch::Tensor& view_idx) const;
+        
+        
+        // Public tensors (equivalent to Python attributes)
+        torch::Tensor pitch_mag;
+        torch::Tensor pitch_dir;
+        torch::Tensor center;
+        torch::Tensor zero_crossings;
+        torch::Tensor ray_jump;
+        torch::Tensor a;
+        torch::Tensor b;
+        
     private:
-        int m_nlayers;
-        torch::Device m_device;
-
-        // Geometric quantities stored as tensors for batched operations.
-        // All tensors reside on m_device.
-        torch::Tensor m_pitch_mag;      // Shape: [nlayers]
-        torch::Tensor m_pitch_dir;      // Shape: [nlayers, 2]
-        torch::Tensor m_center;         // Shape: [nlayers, 2]
-        torch::Tensor m_zero_crossing;  // Shape: [nlayers, nlayers, 2]
-        torch::Tensor m_ray_jump;       // Shape: [nlayers, nlayers, 2]
-        torch::Tensor m_a, m_b;         // Shape: [nlayers, nlayers, nlayers]
+        void init(const torch::Tensor& views);
+        int64_t nviews; // Store nviews as a member
     };
 
+
+    /**
+       Return a tensor with ray pairs defining a number of views.
+
+       If bounds is true (default is false) the first two layers give a
+       rectangular horizontal and vertical bounds.
+
+       The last three layers consist of first two layers symmetric with the last
+       and at some angle.
+
+       Strictly speaking, ray grid is not defined if any views are parallel.
+       The default value of bounds=true indeed produces a parallel pair of
+       views.  A Coordinates object can still be constructed on such ill-formed
+       views.  Any crossings between these views are undefined.
+     */
+    torch::Tensor symmetric_views(double width=100, double height=100, double pitch_mag=3,
+                                  double angle=60*M_PI/180.0, bool bounds = true);
+
+    namespace funcs {
+    /**
+     * @brief Return the perpendicular vector giving the separation between two
+     * parallel rays.
+     * @param r0 A tensor representing the first ray (2 endpoints, 2 coordinates).
+     * @param r1 A tensor representing the second ray (2 endpoints, 2 coordinates).
+     * @return A 2D tensor representing the perpendicular vector.
+     */
+    torch::Tensor pitch(const torch::Tensor& r0, const torch::Tensor& r1);
+
+    /**
+     * @brief Return the vector along ray direction.
+     * @param ray A tensor representing the a ray (2 endpoints, 2 coordinates).
+     * @return A 2D tensor representing the vector along the ray.
+     */
+    torch::Tensor vector(const torch::Tensor& ray);
+
+    /**
+     * @brief Return the unit vector along ray direction.
+     * @param ray A tensor representing the a ray (2 endpoints, 2 coordinates).
+     * @return A 2D tensor representing the unit vector along the ray.
+     */
+    torch::Tensor direction(const torch::Tensor& ray);
+
+    /**
+     * @brief Return point where two non-parallel rays cross.
+     * @param r0 A tensor representing the first ray (2 endpoints, 2 coordinates).
+     * @param r1 A tensor representing the second ray (2 endpoints, 2 coordinates).
+     * @return A 2D tensor representing the intersection point.
+     * @throws std::runtime_error if lines are parallel.
+     */
+    torch::Tensor crossing(const torch::Tensor& r0, const torch::Tensor& r1);
+    }
+
 } // namespace TorchRayGrid
+} // namespace Spng
 } // namespace WireCell
 
 #endif // WIRECELL_TORCHRAYGRID_H
