@@ -1,4 +1,4 @@
-#include "WireCellSpng/TorchRayGrid.h"
+#include "WireCellSpng/RayGrid.h"
 #include <iostream>
 
 // make .index() calls simpler
@@ -6,7 +6,7 @@ using namespace torch::indexing;
 
 namespace WireCell {
 namespace Spng {
-namespace TorchRayGrid {
+namespace RayGrid {
 
 #include <iostream>             // remove, for debug only
 
@@ -388,6 +388,6 @@ void Coordinates::init(const torch::Tensor& views)
 }
 
 
-} // namespace TorchRayGrid
+} // namespace RayGrid
 } // namespace Spng
 } // namespace WireCell

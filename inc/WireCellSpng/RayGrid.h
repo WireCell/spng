@@ -1,10 +1,10 @@
 /**
- * TorchRayGrid.h
+ * Spng::RayGrid.h
  *
- * This file provides the libtorch-based equivalent of RayGrid.h.
- * It defines the geometry of the tomographic views (layers) using
- * torch::Tensor for all numerical data. This enables efficient, batched
- * computations suitable for both CPU and GPU execution.
+ * This file provides the libtorch-based equivalent of WCT's original RayGrid.h.
+ * It defines the geometry of the tomographic views (layers) using torch::Tensor
+ * for all numerical data. This enables efficient, batched computations suitable
+ * for both CPU and GPU execution.
  *
  * Major changes from the original:
  *
@@ -14,8 +14,7 @@
  * - All std::vector, boost::multi_array, and custom Vector classes are replaced
  *   with torch::Tensor.
  * 
- * - Calculations are designed to be performed in batches, eliminating slow,
- *   iterative loops.
+ * - Batched versions of some methods are provided in addition to scalar.
  *
  * - The main Coordinates class provides a convention .to(device) method to move
  *   its data to a given device.
@@ -31,7 +30,7 @@
 
 namespace WireCell {
 namespace Spng {
-namespace TorchRayGrid {
+namespace RayGrid {
 
     /** Ray grid taxonomy
      *
@@ -57,8 +56,16 @@ namespace TorchRayGrid {
         // Constructor
         Coordinates(const torch::Tensor& views);
 
-        /// Return ray crossings.  This comes in three flavors: scalar, hybrid
-        /// scalar/batched and full batched.
+        /** Return ray crossings.
+         *
+         * A ray crossing is a 2D point in the Cartesian coordinate system at
+         * which two rays on different (non-parallel) layers cross.
+         *
+         * This comes in three flavors: scalar, hybrid scalar/batched and full
+         * batched.  Scalar returns a 1D 2 element tensor giving (x,y)
+         * coordinates.  When inputs are batched at size N, a 2D (N,2) sized
+         * tensor is returned.
+         */
         torch::Tensor ray_crossing(int64_t view1, int64_t ray1,
                                    int64_t view2, int64_t ray2) const;
         torch::Tensor ray_crossing(int64_t view1, const torch::Tensor& ray1,
@@ -68,8 +75,16 @@ namespace TorchRayGrid {
                                    const torch::Tensor& view2,
                                    const torch::Tensor& ray2) const;
         
-        /// Return pitch locations.  This comes in three flavors: scalar, hybrid
-        /// scalar/batched and full batched.
+        /** Return pitch locations.
+         *
+         * A pitch location is a distance of a crossing point measured in a
+         * third view.
+         *
+         * This comes in three flavors: scalar, hybrid scalar/batched and full
+         * batched.  Scalar will return a scalar tensor with the pitch distance.
+         * Inputs of batch size N will return a 1D tensor of size N with the
+         * pitch distances.
+         */
         torch::Tensor pitch_location(int64_t view1, int64_t ray1,
                                      int64_t view2, int64_t ray2,
                                      int64_t view_idx) const;
@@ -147,7 +162,7 @@ namespace TorchRayGrid {
     torch::Tensor crossing(const torch::Tensor& r0, const torch::Tensor& r1);
     }
 
-} // namespace TorchRayGrid
+} // namespace RayGrid
 } // namespace Spng
 } // namespace WireCell
 

@@ -1,46 +1,9 @@
-#include "WireCellSpng/TorchRayGrid.h"
+#include "WireCellSpng/RayGrid.h"
 // Name collission for "CHECK" between torch and doctest.
 #undef CHECK
 #include "WireCellUtil/doctest.h"
 
-
-// #include "WireCellUtil/svg.hpp"
-// using namespace svg;
-
-using namespace WireCell::Spng::TorchRayGrid;
-
-// void do_coords_check_batched(const Coordinates& coords,
-//                              const torch::Tensor& view1_batch,
-//                              const torch::Tensor& view2_batch)
-// {
-//     // r0 = coords.zero_crossings[view1, view2] - equivalent batched access
-//     torch::Tensor r0_batched = coords.zero_crossings.index({view1_batch, view2_batch, torch::indexing::Ellipsis});
-
-//     // r1 = coords.ray_crossing_batched((view1,0), (view2,0))
-//     torch::Tensor zero_ray_batch = torch::zeros_like(view1_batch, torch::kLong); // Batch of zeros for ray index
-//     torch::Tensor r1_batched = coords.ray_crossing_batched(
-//         {view1_batch, zero_ray_batch},
-//         {view2_batch, zero_ray_batch}
-//     );
-
-//     std::cout << "\nBatched Check - r0_batched=\n" << r0_batched << std::endl;
-//     std::cout << "Batched Check - r1_batched=\n" << r1_batched << std::endl;
-//     assert(torch::allclose(r0_batched, r1_batched).item<bool>());
-
-//     // dr0 = coords.ray_crossing_batched((view1,0), (view2,1)) - r0
-//     torch::Tensor one_ray_batch = torch::ones_like(view1_batch, torch::kLong); // Batch of ones for ray index
-//     torch::Tensor dr0_batched = coords.ray_crossing_batched(
-//         {view1_batch, zero_ray_batch},
-//         {view2_batch, one_ray_batch}
-//     ) - r0_batched;
-
-//     // dr1 = coords.ray_jump[view1, view2] - equivalent batched access
-//     torch::Tensor dr1_batched = coords.ray_jump.index({view1_batch, view2_batch, torch::indexing::Ellipsis});
-
-//     std::cout << "Batched Check - dr0_batched=\n" << dr0_batched << std::endl;
-//     std::cout << "Batched Check - dr1_batched=\n" << dr1_batched << std::endl;
-//     assert(torch::allclose(dr0_batched, dr1_batched).item<bool>());
-// }
+using namespace WireCell::Spng::RayGrid;
 
 void do_coords_check_batched(const Coordinates& coords, const torch::Tensor& view1_idx, const torch::Tensor& view2_idx)
 {
@@ -140,9 +103,4 @@ TEST_CASE("spng torch raygrid coordinates") {
         4
     );
     std::cout << "Batched p0=" << p0_batched << std::endl;
-    // std::string fname = "doctest_raygrid_coordinates.svg";
-    // Dimensions dimensions(100, 100);
-    // Document doc(fname, Layout(dimensions, Layout::BottomLeft));
-    
-
 }
