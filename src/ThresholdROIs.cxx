@@ -54,6 +54,7 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
     // }
 
     auto tensor_clone = in->tensors()->at(0)->tensor().clone();
+    const auto & input_torch_tensor = in->tensors()->at(0);
 
     if (m_unsqueeze_input)
         tensor_clone = torch::unsqueeze(tensor_clone, 0);
@@ -94,10 +95,15 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
 
 
     Configuration set_md, tensor_md;
+    std::vector<SPNG::TensorKind> tensor_kind = input_torch_tensor->kind();
+    std::vector<SPNG::TensorDomain> tensor_domain = input_torch_tensor->domain();
+    std::vector<std::string> batch_label = input_torch_tensor->batch_label();
 
     tensor_md["tag"] = m_output_tensor_tag;
     set_md["tag"] = m_output_set_tag;
-    auto output_tensor = std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md);
+    auto output_tensor = std::make_shared<SimpleTorchTensor>(
+        tensor_clone, tensor_kind, tensor_domain, batch_label, tensor_md
+    );
     std::vector<ITorchTensor::pointer> itv{
         output_tensor
     };

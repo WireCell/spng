@@ -60,17 +60,22 @@ bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output
     //Get the cloned tensor from the input
     bool found = false;
     auto tensor_clone = torch::empty(0);
+    size_t target_index = 0;
     for (auto torch_tensor : *(in->tensors())) {
         auto md = torch_tensor->metadata();
         if (md.isMember("tag") && (md["tag"] == m_target_tensor)) {
             tensor_clone = torch_tensor->tensor().clone();
             found = true;
+            break;
         }
+        ++target_index;
     }
     if (!found) {
         THROW(ValueError()
             << errmsg{"Could not find tag " + m_target_tensor.asString() + " within input"});
     }
+
+    const auto & input_torch_tensor = in->tensors()->at(target_index);
 
     // auto tensor_clone = in->tensors()->at(0)->tensor().clone();
     auto sizes = tensor_clone.sizes();
@@ -115,9 +120,16 @@ bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output
     Configuration set_md, tensor_md;
     set_md["tag"] = m_output_set_tag;
     tensor_md["tag"] = m_output_tensor_tag;
+    
+    std::vector<SPNG::TensorKind> tensor_kind = input_torch_tensor->kind();
+    std::vector<SPNG::TensorDomain> tensor_domain = input_torch_tensor->domain();
+    std::vector<std::string> batch_label = input_torch_tensor->batch_label();
+
 
     std::vector<ITorchTensor::pointer> itv{
-        std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md)
+        std::make_shared<SimpleTorchTensor>(
+            tensor_clone, tensor_kind, tensor_domain, batch_label, tensor_md
+        )
     };
     out = std::make_shared<SimpleTorchTensorSet>(
         in->ident(), set_md,

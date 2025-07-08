@@ -43,9 +43,12 @@ bool SPNG::FrameToTorch::operator()(const input_pointer& in, output_pointer& out
     }
     log->debug("Put");
 
+    std::vector<SPNG::TensorKind> tensor_kind = {};
+    std::vector<SPNG::TensorDomain> tensor_domain = {};
+
 
     out = SimpleTorchTensor::pointer(
-        new SimpleTorchTensor(output_tensor.clone()));
+        new SimpleTorchTensor(output_tensor.clone(), tensor_kind, tensor_domain));
 
     return true;
 }

@@ -1,6 +1,7 @@
 #include "WireCellSpng/Decon.h"
 #include "WireCellUtil/NamedFactory.h"
 #include "WireCellUtil/Exceptions.h"
+#include "WireCellUtil/String.h"
 #include "WireCellSpng/SimpleTorchTensor.h"
 #include "WireCellSpng/SimpleTorchTensorSet.h"
 // #include "WireCellSpng/ITorchFieldResponse.h"
@@ -54,31 +55,24 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     log->debug("Running Decon");
 
     // //Get the cloned tensor from the input
-    // size_t ntensors = in->tensors()->size();
-    // log->debug("Got {} tensors", ntensors);
-    // std::vector<int64_t> prev_shape = {-999, -999};
-    // for (size_t i = 0; i < ntensors; ++i) {
-    //     auto this_sizes = in->tensors()->at(i)->tensor().sizes();
-    //     if (i == 0) {
-    //         prev_shape = this_sizes;
-    //     }
-    //     // if (prev_shape[0] != this_sizes[0] || prev_shape[1] != this_sizes[1]) {
-    //     //     log->debug("Size mismatch in tensors");
-    //     //     //TODO -- throw error
-    //     // }
-    //     log->debug("Tensor {} has shape {} {}", i, this_sizes[0], this_sizes[1]);
-    // }
-
-    auto tensor_clone = in->tensors()->at(0)->tensor().clone();
+    auto input_torch_tensor = in->tensors()->at(0);
+    auto tensor_clone = input_torch_tensor->tensor().clone();
     
-    if (m_unsqueeze_input)
-        tensor_clone = torch::unsqueeze(tensor_clone, 0);
+    // if (m_unsqueeze_input)
+    //     tensor_clone = torch::unsqueeze(tensor_clone, 0);
+
+    //Expect batch in first dimension
+    const auto & kind = input_torch_tensor->kind();
+    if (!((kind[0] == kBatch) && (kind[1] == kChannel) && (kind[2] == kTick))) {
+        THROW(ValueError() << errmsg{String::format("Unexpected kind of input tensor %s %s %s", kBatch, kChannel, kTick)});
+    }
 
     auto sizes = tensor_clone.sizes();
     std::vector<int64_t> shape;
     for (const auto & s : sizes) {
         shape.push_back(s);
     }
+
     std::vector<int64_t> response_shape(shape.begin()+1, shape.end());
 
     int64_t original_nchans = shape[1];
@@ -171,14 +165,21 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
         log->debug("Unpadded to {}", tensor_clone.sizes()[1]);
     }
 
-    if (m_unsqueeze_input)
-        torch::squeeze(tensor_clone, 0);
+    // if (m_unsqueeze_input)
+    //     torch::squeeze(tensor_clone, 0);
     
     Configuration set_md, tensor_md;
 
     tensor_md["tag"] = m_output_tensor_tag;
     set_md["tag"] = m_output_set_tag;
-    auto output_tensor = std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md);
+    std::vector<SPNG::TensorKind> tensor_kind = input_torch_tensor->kind();
+    std::vector<SPNG::TensorDomain> tensor_domain = input_torch_tensor->domain();
+    std::vector<std::string> batch_label = input_torch_tensor->batch_label();
+
+
+    auto output_tensor = std::make_shared<SimpleTorchTensor>(
+        tensor_clone, tensor_kind, tensor_domain, batch_label, tensor_md
+    );
     std::vector<ITorchTensor::pointer> itv{
         output_tensor
     };

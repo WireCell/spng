@@ -39,10 +39,13 @@ bool TensorToTorch::operator()(const input_pointer& tensorset_in, output_pointer
         auto torch_tensor = torch::from_blob(
             (void*)tensor_ptr->data(), tensor_ptr->size()
         );
+        std::vector<SPNG::TensorKind> tensor_kind = {};
+        std::vector<SPNG::TensorDomain> tensor_domain = {};
+        std::vector<std::string> batch_label = {};
 
         //Make shared ptr using the tensor's metadata
         torch_tensor_vec.emplace_back(std::make_shared<SimpleTorchTensor>(
-            torch_tensor, tensor_ptr->metadata()
+            torch_tensor, tensor_kind, tensor_domain, batch_label, tensor_ptr->metadata()
         ));
     }
 

@@ -4,6 +4,7 @@
 #include <torch/torch.h>
 #include "WireCellIface/IData.h"
 #include "WireCellUtil/Configuration.h"
+#include "SPNGEnums.h"
 
 namespace WireCell {
 class ITorchTensor : public IData<ITorchTensor> {
@@ -13,6 +14,10 @@ class ITorchTensor : public IData<ITorchTensor> {
     virtual std::string dtype() const = 0;
     virtual std::vector<int64_t> shape() const = 0;
     virtual torch::Device device() const = 0;
+
+    virtual const std::vector<SPNG::TensorKind> & kind() const = 0;
+    virtual const std::vector<SPNG::TensorDomain> & domain() const = 0;
+    virtual const std::vector<std::string> & batch_label() const = 0;
 };
 }
 

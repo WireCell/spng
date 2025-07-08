@@ -176,17 +176,29 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     for (const auto & [output_index, nchannels] : m_output_nchannels) {
         
         // TODO: set md
-        Configuration set_md;
+        Configuration set_md, tensor_md;
         set_md["period"] = in->tick();
+
+        std::vector<SPNG::TensorKind> output_type = {kChannel, kTick};
+        std::vector<SPNG::TensorDomain> output_domain = {kInterval, kInterval};
+        std::vector<std::string> batch_label = {};
 
         if (m_unsqueeze_output) {
             tensors[output_index] = torch::unsqueeze(tensors[output_index], 0);
+            output_type.insert(output_type.begin(), kBatch);
+            output_domain.insert(output_domain.begin(), kNull);
+            batch_label.push_back("Asdf"); // TODO -- replace this 
         }
 
         //Clone the tensor to take ownership of the memory and put into 
         //output 
         std::vector<ITorchTensor::pointer> itv{
-            std::make_shared<SimpleTorchTensor>(tensors[output_index].to(device)) //.clone())
+            std::make_shared<SimpleTorchTensor>(
+                tensors[output_index].to(device),
+                output_type,
+                output_domain,
+                batch_label,
+                tensor_md),
         };
         outv[output_index] = std::make_shared<SimpleTorchTensorSet>(
             in->ident(), set_md,

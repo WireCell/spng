@@ -78,9 +78,13 @@ bool SPNG::TorchTensorSetCollator::operator()(const input_vector& inv, output_po
             log->debug("Adding tensor with tag {}", combined_tag);
             Configuration tensor_md;
             tensor_md["tag"] = combined_tag;
-            itv.push_back(
-                std::make_shared<SimpleTorchTensor>(tensor->tensor(), tensor_md)
-            );
+            std::vector<SPNG::TensorKind> tensor_kind = {};
+            std::vector<SPNG::TensorDomain> tensor_domain = {};
+            std::vector<std::string> batch_label = {};
+
+            itv.push_back(std::make_shared<SimpleTorchTensor>(
+                tensor->tensor(), tensor_kind, tensor_domain, batch_label, tensor_md
+            ));
         }
     }
 

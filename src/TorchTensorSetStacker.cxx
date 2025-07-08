@@ -71,12 +71,36 @@ bool SPNG::TorchTensorSetStacker::operator()(const input_vector& inv, output_poi
 
     std::vector<torch::Tensor> inputs;
 
-    // std::vector<ITorchTensor::pointer> itv;
+    std::vector<TensorKind> output_kind;
+    std::vector<TensorDomain> output_domain;
+
     for (auto in : inv) {
         auto this_set_tag = in->metadata()["tag"];
+        
         for (auto tensor : (*in->tensors())) {
+            const auto & this_kind = tensor->kind();
+            const auto & this_domain = tensor->domain();
 
-            inputs.push_back(tensor->tensor());
+            //Check that kind + domain matches
+            if (output_kind.size() == 0) {//First time
+                output_kind = this_kind;
+                output_domain = this_domain;
+            }
+            else {
+                if (this_kind != output_kind) {
+                    THROW(ValueError() << errmsg{"Trying to stack tensors with mismatching TensorKinds"});
+                }
+                if (this_domain != output_domain) {
+                    THROW(ValueError() << errmsg{"Trying to stack tensors with mismatching TensorDomains"});
+                }
+            }
+            
+            inputs.push_back(tensor->tensor().clone());
+
+            //We might need to unsqueeze this so we can concat later
+            if (this_kind[0] != kBatch)
+                inputs.back() = torch::unsqueeze(inputs.back(), 0);
+            
 
             // auto this_tensor_tag = tensor->metadata()["tag"];
             // std::string combined_tag = this_set_tag.asString() + ":" + this_tensor_tag.asString();
@@ -89,7 +113,17 @@ bool SPNG::TorchTensorSetStacker::operator()(const input_vector& inv, output_poi
         }
     }
     Configuration tensor_md;
-    auto output_tensor = std::make_shared<SimpleTorchTensor>(torch::cat(inputs), tensor_md);
+    // std::vector<SPNG::TensorKind> tensor_kind = {};
+    // std::vector<SPNG::TensorDomain> tensor_domain = {};
+    if (output_kind[0] != kBatch) {
+        output_kind.insert(output_kind.begin(), kBatch);
+        output_domain.insert(output_domain.begin(), kNull);
+    }
+    std::vector<std::string> batch_label(inputs.size(), "temp");
+
+    auto output_tensor = std::make_shared<SimpleTorchTensor>(
+        torch::cat(inputs), output_kind, output_domain, batch_label, tensor_md
+    );
     std::vector<ITorchTensor::pointer> itv{
         output_tensor
     };
