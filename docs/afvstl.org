@@ -83,6 +83,8 @@ $ wcwc view -S wirecell -d afvslt \
    -s "py-torch" \
    -s "nlohmann-json" \
    -s "go-jsonnet" \
+   -s "eigen" \
+   -s "fftw" \
    afvslt/local
 $ cd afvslt && direnv allow
 $ git clone git@github.com:wirecell/spng.git
@@ -125,28 +127,43 @@ Each time is an average over a number of repeats of the operation sufficient to 
 
 The results:
 
-| test   | dev | tech | time (ms) |
-|--------+-----+------+-----------|
-| arith  | GPU | AF   |      0.14 |
-| arith  | GPU | LT   |      0.36 |
-| arith  | CPU | AF   |     33.40 |
-| arith  | CPU | LT   |     11.91 |
-|--------+-----+------+-----------|
-| convo  | GPU | AF   |      2.20 |
-| convo  | GPU | LT   |      0.89 |
-| convo  | CPU | AF   |    667.74 |
-| convo  | CPU | LT   |    158.24 |
-|--------+-----+------+-----------|
-| median | GPU | AF   |      1.30 |
-| median | GPU | LT   |      0.18 |
-| median | CPU | AF   |   1109.09 |
-| median | CPU | LT   |     76.73 |
-|--------+-----+------+-----------|
-| sort   | GPU | AF   |      1.33 |
-| sort   | GPU | LT   |      1.55 |
-| sort   | CPU | AF   |   1119.37 |
-| sort   | CPU | LT   |    383.22 |
-|--------+-----+------+-----------|
+
+| test   | dev | tech | time (ms) | notes            |
+|--------+-----+------+-----------+------------------|
+| arith  | GPU | AF   |      0.14 |                  |
+| arith  | GPU | LT   |      0.36 |                  |
+|--------+-----+------+-----------+------------------|
+| arith  | CPU | AF   |     33.40 |                  |
+| arith  | CPU | LT   |     11.91 |                  |
+| arith  | CPU | EI   |     18.78 |                  |
+|--------+-----+------+-----------+------------------|
+|--------+-----+------+-----------+------------------|
+| convo  | GPU | AF   |      2.20 |                  |
+| convo  | GPU | AF   |      2.02 | fwd is r2c       |
+| convo  | GPU | LT   |      0.89 |                  |
+|--------+-----+------+-----------+------------------|
+| convo  | CPU | AF   |    667.74 |                  |
+| convo  | CPU | AF   |    414.30 | fwd is r2c       |
+| convo  | CPU | LT   |    158.24 |                  |
+| convo  | CPU | EI   |    489.61 | fftw3            |
+| convo  | CPU | EI   |    309.31 | fftw3 fwd is r2c |
+|--------+-----+------+-----------+------------------|
+|--------+-----+------+-----------+------------------|
+| median | GPU | AF   |      1.30 |                  |
+| median | GPU | LT   |      0.18 |                  |
+|--------+-----+------+-----------+------------------|
+| median | CPU | AF   |   1109.09 |                  |
+| median | CPU | LT   |     76.73 |                  |
+| median | CPU | EI   |     90.98 | ~std::nth_element~ |
+|--------+-----+------+-----------+------------------|
+|--------+-----+------+-----------+------------------|
+| sort   | GPU | AF   |      1.33 |                  |
+| sort   | GPU | LT   |      1.55 |                  |
+|--------+-----+------+-----------+------------------|
+| sort   | CPU | AF   |   1119.37 |                  |
+| sort   | CPU | LT   |    383.22 |                  |
+| sort   | CPU | EI   |    317.24 | ~std::sort~        |
+|--------+-----+------+-----------+------------------|
 
 This is reproduced with:
 #+begin_example
@@ -159,6 +176,15 @@ May narrow to a subset of tests:
  jsonnet -A tests=convo,sort -A devices=gpu -A techs=af spng/test/afvslt.jsonnet | OMP_NUM_THREADS=1 ./afvslt
 #+end_example
 
+** Comments and conclusions 
+
+- The "EI" test uses Eigen arrays but only the "arith" test uses Eigen operators.  The rest are ~std::~ or FFTW3 algs operating on the data in the Eigen arrays.
+- Torch/CPU apparently beats FFTW3 by x3.  This surprising result led to refining the FFTW3 forward DFT to be an R2C optimization.  This reduces torch to x2 faster.  The remaining difference is assumed to be due to Torch using C2R optimization for the inv FFT.
+- ArrayFire is also apparently not detecting R2C or C2R.  It has these specializations.  They require handling the missing "half" of Hermitian symmetry.
+- Implementing explicit R2C in the AF convo test to mimic what was done for the EI convo test shows a relative speedup on CPU that is consistent with what is seen in the FFTW R2C specialization.  The speedup of AF on GPU with R2C is not consistent.  AF GPU must have some other, large overhead.  The relative CPU AF speedup is consistent with FFTW's.
+- It is likely that R2C and C2R optimization of AF convo would bring CPU similar to Torch CPU.  But, given the lack of improvement with just R2C on GPU for AF, it is uncertain if C2R on GPU would bring AF on par with Torch. OTOH, 2ms vs 1ms round trip convo is perhaps negligible compared to other time users.
+- AF CPU median result is relatively abysmal and it is likely due to a sort being performed.  AF CPU sort is also abysmal and takes nearly the same time which reinforces the conclusion that AF CPU median is doing a sort.  OTOH, AF GPU beats LT GPU on sort.
+- In principle, AF could be used as the array type and its memory loaned to others which have better algorithms.  Eg, ~std::nth_element~ can be used to implement ~median()~ when device is CPU.  And, perhaps torch can be used for ~median()~ on GPU.
 
 * Build issues
 
