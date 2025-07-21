@@ -1,393 +1,372 @@
+// RayGrid.cpp
 #include "WireCellSpng/RayGrid.h"
-#include <iostream>
 
-// make .index() calls simpler
-using namespace torch::indexing;
+namespace WireCell::Spng::RayGrid {
 
-namespace WireCell {
-namespace Spng {
-namespace RayGrid {
+// --- Helper functions from funcs.py ---
 
-#include <iostream>             // remove, for debug only
-
-namespace funcs {
-torch::Tensor pitch(const torch::Tensor& r0, const torch::Tensor& r1) {
-    // along ray 0
-    torch::Tensor rdir = r0.index({1}) - r0.index({0}); // r0[1] - r0[0]
-    
-    // transpose to get unit perpendicular
-    // torch.tensor([-rdir[1], rdir[0]]) / torch.norm(rdir)
-    torch::Tensor uperp = torch::tensor({-rdir.index({1}).item<double>(),
-            rdir.index({0}).item<double>()}, torch::kDouble);
-    uperp = uperp / torch::norm(rdir);
-
-    // connecting vector between points on either ray
-    // r1[0]-r0[0]
-    torch::Tensor cvec = r1.index({0}) - r0.index({0});
-    
-    // project onto the perpendicular
-    // torch.dot(cvec, uperp)
-    torch::Tensor pdist = torch::dot(cvec, uperp);
-    return pdist * uperp;
-}
-
-torch::Tensor vector(const torch::Tensor& ray) {
-    // ray[1] - ray[0]
-    return ray.index({1}) - ray.index({0});
-}
-
-torch::Tensor direction(const torch::Tensor& ray) {
-    torch::Tensor d = funcs::vector(ray);
-    return d / torch::norm(d);
-}
-
-torch::Tensor crossing(const torch::Tensor& r0, const torch::Tensor& r1) {
-    torch::Tensor p1 = r0.index({0});
-    torch::Tensor p2 = r0.index({1});
-    torch::Tensor p3 = r1.index({0});
-    torch::Tensor p4 = r1.index({1});
-
-    // x1, y1 = p1
-    double x1 = p1.index({0}).item<double>();
-    double y1 = p1.index({1}).item<double>();
-    // x2, y2 = p2
-    double x2 = p2.index({0}).item<double>();
-    double y2 = p2.index({1}).item<double>();
-    // x3, y3 = p3
-    double x3 = p3.index({0}).item<double>();
-    double y3 = p3.index({1}).item<double>();
-    // x4, y4 = p4
-    double x4 = p4.index({0}).item<double>();
-    double y4 = p4.index({1}).item<double>();
-
-    double denominator_val = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-    
-    // Using torch::isclose requires tensors, but for a single scalar,
-    // a direct comparison with a small epsilon is often more straightforward
-    // in C++ for performance, or create a scalar tensor to use torch::isclose.
-    // For direct comparison, we'll use a small epsilon.
-    // If you need the exact torch.isclose behavior, you'd do:
-    // if (torch::isclose(torch::tensor(denominator_val), torch::tensor(0.0)).item<bool>())
-    if (std::abs(denominator_val) < 1e-9) { // A common small epsilon
-        throw std::runtime_error("parallel lines do not cross");
+    torch::Tensor pitch(const torch::Tensor& r0, const torch::Tensor& r1) {
+        // rdir = r0[1] - r0[0]
+        torch::Tensor rdir = r0.index({1}) - r0.index({0});
+        // uperp = torch.tensor([-rdir[1], rdir[0]]) / torch.norm(rdir)
+        torch::Tensor uperp = torch::tensor({-rdir.index({1}).item<double>(), rdir.index({0}).item<double>()}, torch::kDouble) / torch::norm(rdir);
+        // cvec = r1[0]-r0[0]
+        torch::Tensor cvec = r1.index({0}) - r0.index({0});
+        // pdist = torch.dot(cvec, uperp)
+        torch::Tensor pdist = torch::dot(cvec, uperp);
+        return pdist * uperp;
     }
 
-    double t_numerator_val = (x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4);
-    double t_val = t_numerator_val / denominator_val;
-    torch::Tensor t = torch::tensor(t_val, torch::kDouble);
+    torch::Tensor crossing(const torch::Tensor& r0, const torch::Tensor& r1) {
+        torch::Tensor p1 = r0.index({0});
+        torch::Tensor p2 = r0.index({1});
+        torch::Tensor p3 = r1.index({0});
+        torch::Tensor p4 = r1.index({1});
 
-    // intersection_point = p1 + t * (p2 - p1)
-    torch::Tensor intersection_point = p1 + t * (p2 - p1);
-    return intersection_point;
-}
-}
+        double x1 = p1.index({0}).item<double>();
+        double y1 = p1.index({1}).item<double>();
+        double x2 = p2.index({0}).item<double>();
+        double y2 = p2.index({1}).item<double>();
+        double x3 = p3.index({0}).item<double>();
+        double y3 = p3.index({1}).item<double>();
+        double x4 = p4.index({0}).item<double>();
+        double y4 = p4.index({1}).item<double>();
 
-torch::Tensor symmetric_views(double width, double height, double pitch_mag, double angle, bool bounds)
-{
-    std::cerr << "symmetric_views\n";
+        double denominator = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
 
-    // 5 layers, 2 rays per layer, 2 points per ray, 2 coordinates per point
-    int nlayers = 3;
-    if (bounds) nlayers = 5;
-    auto layers = torch::zeros({nlayers,2,2,2}, torch::kDouble);
-    
-    // "Y" and "Z" axes, names are historic from the old RayGrid assuming 3D.
-    const auto why = torch::tensor({1.0, 0.0}, torch::kDouble);
-    const auto zee = torch::tensor({0.0, 1.0}, torch::kDouble);
-    
-    const auto ll = torch::tensor({0.0, 0.0}, torch::kDouble);
-    const auto lr = torch::tensor({0.0, width}, torch::kDouble);
-    const auto ul = torch::tensor({height, 0.0}, torch::kDouble);
-    const auto ur = torch::tensor({height, width}, torch::kDouble);
+        if (torch::isclose(torch::tensor(denominator), torch::tensor(0.0)).item<bool>()) {
+            throw std::runtime_error("parallel lines do not cross");
+        }
 
-    int layer = -1;
+        double t_numerator = (x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4);
+        torch::Tensor t = torch::tensor(t_numerator / denominator, torch::kDouble);
 
-    if (bounds) {
-        // horizontal bounds
-        ++layer;
-        layers.index_put_({layer, 0, 0}, ll);
-        layers.index_put_({layer, 0, 1}, lr);
-        layers.index_put_({layer, 1, 0}, ul);
-        layers.index_put_({layer, 1, 1}, ur);
-
-        // vertical bounds
-        ++layer;
-        layers.index_put_({layer, 0, 0}, ll);
-        layers.index_put_({layer, 0, 1}, ul);
-        layers.index_put_({layer, 1, 0}, lr);
-        layers.index_put_({layer, 1, 1}, ur);
+        torch::Tensor intersection_point = p1 + t * (p2 - p1);
+        return intersection_point;
     }
 
-    // /-wires
-    ++layer;
+    torch::Tensor vector(const torch::Tensor& ray) {
+        return ray.index({1}) - ray.index({0});
+    }
+
+    torch::Tensor ray_direction(const torch::Tensor& ray) {
+        torch::Tensor n = vector(ray);
+        torch::Tensor d = torch::linalg_norm(n);
+        // Handle division by zero for zero-length vectors
+        if (d.item<double>() == 0.0) {
+            return torch::zeros_like(n);
+        }
+        return n / d;
+    }
+
+
+// --- Coordinates class implementation ---
+
+    Coordinates::Coordinates(const torch::Tensor& views)
     {
-        const auto d = torch::tensor({cos(angle), sin(angle)}, torch::kDouble);
-        const auto p = torch::tensor({-d[1].item<double>(), d[0].item<double>()}, torch::kDouble);
-        {
-            const auto pjump = 0.5 * pitch_mag * p;
-            const auto mjump2 = torch::dot(pjump, pjump);
-            layers.index_put_({layer, 0, 0}, ul + why * mjump2 / torch::dot(why, pjump));
-            layers.index_put_({layer, 0, 1}, ul + zee * mjump2 / torch::dot(zee, pjump));
-        }
-        {
-            const auto pjump = 1.5 * pitch_mag * p;
-            const auto mjump2 = torch::dot(pjump, pjump);
-            layers.index_put_({layer, 1, 0}, ul + why * mjump2 / torch::dot(why, pjump));
-            layers.index_put_({layer, 1, 1}, ul + zee * mjump2 / torch::dot(zee, pjump));
-        }
+        init(views);
     }
 
-    // \-wires
-    ++layer;
+    void Coordinates::to(torch::Device device)
     {
-        const auto d = torch::tensor({cos(angle), -sin(angle)}, torch::kDouble);
-        const auto p = torch::tensor({-d[1].item<double>(), d[0].item<double>()}, torch::kDouble);
-        {
-            const auto pjump = 0.5 * pitch_mag * p;
-            const auto mjump2 = torch::dot(pjump, pjump);
-            layers.index_put_({layer, 0, 0}, ll + why * mjump2 / torch::dot(why, pjump));
-            layers.index_put_({layer, 0, 1}, ll + zee * mjump2 / torch::dot(zee, pjump));
-        }
-        {
-            const auto pjump = 1.5 * pitch_mag * p;
-            const auto mjump2 = torch::dot(pjump, pjump);
-            layers.index_put_({layer, 1, 0}, ll + why * mjump2 / torch::dot(why, pjump));
-            layers.index_put_({layer, 1, 1}, ll + zee * mjump2 / torch::dot(zee, pjump));
-        }
+        pitch_mag = pitch_mag.to(device);
+        pitch_dir = pitch_dir.to(device);
+        center = center.to(device);
+        zero_crossings = zero_crossings.to(device);
+        ray_jump = ray_jump.to(device);
+        ray_dir = ray_dir.to(device);
+        a = a.to(device);
+        b = b.to(device);
     }
 
-    // |-wires
-    ++layer;
-    const auto pjumpw = pitch_mag * zee;
-    layers.index_put_({layer, 0, 0}, ll + 0.0 * pjumpw);
-    layers.index_put_({layer, 0, 1}, ul + 0.0 * pjumpw);
-    layers.index_put_({layer, 1, 0}, ll + 1.0 * pjumpw);
-    layers.index_put_({layer, 1, 1}, ul + 1.0 * pjumpw);
- 
-    return layers;
-}
 
-// Use torch::indexing namespace for cleaner code with tensor indexing
-using namespace torch::indexing;
-
-Coordinates::Coordinates(const torch::Tensor& views)
-{
-    // Ensure views is double precision
-    if (views.dtype() != torch::kDouble) {
-        // Optionally convert, or throw an error if input must strictly be double
-        // views = views.to(torch::kDouble);
-        std::cerr << "Warning: 'views' tensor is not of type torch::kDouble. Converting." << std::endl;
-        const_cast<torch::Tensor&>(views) = views.to(torch::kDouble);
-    }
-    init(views);
-}
-
-
-torch::Tensor Coordinates::ray_crossing(int64_t view1, int64_t ray1, int64_t view2, int64_t ray2) const
-{
-
-    torch::Tensor r00 = zero_crossings.index({view1, view2});
-    torch::Tensor w12 = ray_jump.index({view1, view2});
-    torch::Tensor w21 = ray_jump.index({view2, view1});
-    
-    return r00 + static_cast<double>(ray2) * w12 + static_cast<double>(ray1) * w21;
-}
-
-torch::Tensor Coordinates::ray_crossing(int64_t view1, const torch::Tensor& ray1,
-                                        int64_t view2, const torch::Tensor& ray2) const
-{
-    // Ensure ray batches are 1D tensors of the same size and type
-    assert(ray1.dim() == 1 && ray2.dim() == 1);
-    assert(ray1.sizes()[0] == ray2.sizes()[0]);
-    assert(ray1.dtype() == torch::kLong && ray2.dtype() == torch::kLong);
-
-    // r00 and w12, w21 are scalar tensors (2 coordinates),
-    // they will be broadcasted to the batch size
-    torch::Tensor r00_scalar_tensor = zero_crossings.index({view1, view2}); // Shape (2)
-    torch::Tensor w12_scalar_tensor = ray_jump.index({view1, view2});       // Shape (2)
-    torch::Tensor w21_scalar_tensor = ray_jump.index({view2, view1});       // Shape (2)
-
-    // Expand scalars to (1, 2) to enable broadcasting with (batch_size, 1) * (1, 2)
-    // Or let LibTorch handle broadcasting from (2) to (batch_size, 2) when combined with (batch_size, 1)
-    // More explicitly, expand the 2-element vectors if they are used as part of a batch-wise operation.
-    // However, if we just multiply with unsqueezed ray indices, the result will be (batch_size, 2)
-    // which is the desired output.
-
-    // ray1 and ray2 need to be unsqueezed to (batch_size, 1) for multiplication
-    // with (2) resulting in (batch_size, 2) after broadcasting.
-    return r00_scalar_tensor + ray2.unsqueeze(-1) * w12_scalar_tensor + ray1.unsqueeze(-1) * w21_scalar_tensor;
-}
-
-torch::Tensor Coordinates::ray_crossing(const torch::Tensor& view1, const torch::Tensor& ray1,
-                                        const torch::Tensor& view2, const torch::Tensor& ray2) const
-{
-    // Ensure all input batches are 1D tensors of the same size and type
-    assert(view1.dim() == 1 && ray1.dim() == 1 && view2.dim() == 1 && ray2.dim() == 1);
-    assert(view1.sizes()[0] == ray1.sizes()[0] &&
-           view1.sizes()[0] == view2.sizes()[0] &&
-           view1.sizes()[0] == ray2.sizes()[0]);
-    assert(view1.dtype() == torch::kLong && ray1.dtype() == torch::kLong &&
-           view2.dtype() == torch::kLong && ray2.dtype() == torch::kLong);
-
-    // Gather zero_crossings and ray_jump based on batched indices
-    torch::Tensor r00_batched = zero_crossings.index({view1, view2, Ellipsis}); // Shape (batch_size, 2)
-    torch::Tensor w12_batched = ray_jump.index({view1, view2, Ellipsis});       // Shape (batch_size, 2)
-    torch::Tensor w21_batched = ray_jump.index({view2, view1, Ellipsis});       // Shape (batch_size, 2)
-
-    // ray1 and ray2 need to be unsqueezed to (batch_size, 1) for correct broadcasting
-    // with (batch_size, 2) tensors.
-    return r00_batched + ray2.unsqueeze(-1) * w12_batched + ray1.unsqueeze(-1) * w21_batched;
-}
-
-
-
-torch::Tensor Coordinates::pitch_location(int64_t view1, int64_t ray1, int64_t view2, int64_t ray2,
-                                          int64_t view_idx) const
-{
-    double b_val = b.index({view1, view2, view_idx}).item<double>();
-    double a12_val = a.index({view1, view2, view_idx}).item<double>();
-    double a21_val = a.index({view2, view1, view_idx}).item<double>();
-
-    return torch::tensor(b_val + static_cast<double>(ray2) * a12_val + static_cast<double>(ray1) * a21_val, torch::kDouble);
-}
-
-torch::Tensor Coordinates::pitch_location(int64_t view1, const torch::Tensor& ray1,
-                                          int64_t view2, const torch::Tensor& ray2,
-                                          int64_t view_idx) const {
-    // Ensure ray batches are 1D tensors of the same size and type
-    assert(ray1.dim() == 1 && ray2.dim() == 1);
-    assert(ray1.sizes()[0] == ray2.sizes()[0]);
-    assert(ray1.dtype() == torch::kLong && ray2.dtype() == torch::kLong);
-
-    // Get scalar values from the 'a' and 'b' tensors
-    double b_val = b.index({view1, view2, view_idx}).item<double>();
-    double a12_val = a.index({view1, view2, view_idx}).item<double>();
-    double a21_val = a.index({view2, view1, view_idx}).item<double>();
-
-    // Perform element-wise multiplication and addition.
-    // ray1 and ray2 (kLong) need to be cast to kDouble for multiplication with doubles.
-    return torch::tensor(b_val, torch::kDouble) + ray2.to(torch::kDouble) * a12_val + ray1.to(torch::kDouble) * a21_val;
-}
-
-torch::Tensor Coordinates::pitch_location(const torch::Tensor& view1, const torch::Tensor& ray1,
-                                          const torch::Tensor& view2, const torch::Tensor& ray2,
-                                          const torch::Tensor& view_idx) const {
-    // Ensure all input batches are 1D tensors of the same size and type
-    assert(view1.dim() == 1 && ray1.dim() == 1 && view2.dim() == 1 && ray2.dim() == 1 && view_idx.dim() == 1);
-    assert(view1.sizes()[0] == ray1.sizes()[0] &&
-           view1.sizes()[0] == view2.sizes()[0] &&
-           view1.sizes()[0] == ray2.sizes()[0] &&
-           view1.sizes()[0] == view_idx.sizes()[0]);
-    assert(view1.dtype() == torch::kLong && ray1.dtype() == torch::kLong &&
-           view2.dtype() == torch::kLong && ray2.dtype() == torch::kLong &&
-           view_idx.dtype() == torch::kLong);
-
-    // Gather 'b' and 'a' values using advanced indexing.
-    // The result will be 1D tensors of shape (batch_size).
-    torch::Tensor b_batched = b.index({view1, view2, view_idx});
-    torch::Tensor a12_batched = a.index({view1, view2, view_idx});
-    torch::Tensor a21_batched = a.index({view2, view1, view_idx});
-
-    // Perform the calculation.
-    // ray1 and ray2 (kLong) need to be cast to kDouble for multiplication.
-    return b_batched + ray2.to(torch::kDouble) * a12_batched + ray1.to(torch::kDouble) * a21_batched;
-}    
-
-
-
-void Coordinates::init(const torch::Tensor& views)
-{
-    nviews = views.sizes()[0];
-
-    // Initialize member tensors with torch::zeros and kDouble
-    pitch_mag = torch::zeros({nviews}, torch::kDouble);
-    pitch_dir = torch::zeros({nviews, 2}, torch::kDouble);
-    center = torch::zeros({nviews, 2}, torch::kDouble);
-    zero_crossings = torch::zeros({nviews, nviews, 2}, torch::kDouble);
-    ray_jump = torch::zeros({nviews, nviews, 2}, torch::kDouble);
-    a = torch::zeros({nviews, nviews, nviews}, torch::kDouble);
-    b = torch::zeros({nviews, nviews, nviews}, torch::kDouble);
-
-    // Per-view things
-    // Loop through the first dimension of 'views' (N-views)
-    for (int64_t layer = 0; layer < nviews; ++layer) {
-        // views[layer] gives a (2, 2, 2) tensor, representing (2 rays, 2 endpoints, 2 coords) for this view.
-        // So, r0 and r1 are (2, 2) tensors.
-        torch::Tensor r0 = views.index({layer, 0}); // views[layer, 0]
-        torch::Tensor r1 = views.index({layer, 1}); // views[layer, 1]
-
-        torch::Tensor rpv = funcs::pitch(r0, r1);
-        double rpl = torch::norm(rpv).item<double>();
-
-        pitch_mag.index_put_({layer}, rpl);
-        pitch_dir.index_put_({layer}, rpv / rpl);
-        center.index_put_({layer}, 0.5 * (r0.index({0}) + r0.index({1}))); // 0.5 * (r0[0] + r0[1])
+    long Coordinates::nviews() const {
+        return pitch_mag.size(0);
     }
 
-    // Cross-view things
-    for (int64_t il = 0; il < nviews; ++il) {
-        torch::Tensor rl0 = views.index({il, 0}); // rl0 = views[il, 0]
-        torch::Tensor rl1 = views.index({il, 1}); // rl1 = views[il, 1]
-
-        for (int64_t im = 0; im < nviews; ++im) {
-            torch::Tensor rm0 = views.index({im, 0}); // rm0 = views[im, 0]
-            torch::Tensor rm1 = views.index({im, 1}); // rm1 = views[im, 1]
-
-            // Special case diagonal values
-            if (il == im) {
-                zero_crossings.index_put_({il, im}, center.index({il}));
-                ray_jump.index_put_({il, im}, funcs::direction(rl0)); // Equivalent to funcs.direction(views[il, 0])
-                continue;
-            }
-
-            if (il < im) {
-                torch::Tensor p;
-                try {
-                    p = funcs::crossing(rl0, rm0);
-                    zero_crossings.index_put_({il, im}, p);
-                    zero_crossings.index_put_({im, il}, p); // Exploit symmetry
-                    ray_jump.index_put_({il, im}, funcs::crossing(rl0, rm1) - p);
-                    ray_jump.index_put_({im, il}, funcs::crossing(rm0, rl1) - p);
-                } catch (const std::runtime_error& e) {
-                    std::cout << "skipping parallel view pair: il=" << il << " im=" << im << " (" << e.what() << ")" << std::endl;
-                    // Python's `continue` here effectively means these elements remain zeros
-                    // which is what our `torch::zeros` initialization does.
-                }
-            }
+    torch::Tensor Coordinates::bounding_box() const {
+        // Python: if self.pitch_dir[0,0] == 0:
+        // C++: self.pitch_dir.index({0, 0}).item<double>() == 0.0
+        if (pitch_dir.index({0, 0}).item<double>() == 0.0) { // points up, hbounds is view 0
+            torch::Tensor x0 = center.index({1, 0});
+            torch::Tensor y0 = center.index({0, 1});
+            torch::Tensor x1 = x0 + pitch_mag.index({1});
+            torch::Tensor y1 = y0 + pitch_mag.index({0});
+            return torch::stack({torch::stack({x0, x1}), torch::stack({y0, y1})});
+        } else {
+            torch::Tensor x0 = center.index({0, 1});
+            torch::Tensor y0 = center.index({1, 0});
+            torch::Tensor x1 = x0 + pitch_mag.index({0});
+            torch::Tensor y1 = y0 + pitch_mag.index({1});
+            return torch::stack({torch::stack({x0, x1}), torch::stack({y0, y1})});
         }
     }
 
-    // Triple layer things
-    for (int64_t ik = 0; ik < nviews; ++ik) {
-        torch::Tensor pk = pitch_dir.index({ik});
-        double cp = torch::dot(center.index({ik}), pk).item<double>();
+    torch::Tensor Coordinates::point_pitches(const torch::Tensor& points) const {
+        if (points.dim() != 2 || points.size(1) != 2) {
+            throw std::invalid_argument("Input 'points' must be a tensor of shape (nbatch, 2).");
+        }
 
-        for (int64_t il = 0; il < nviews; ++il) {
-            if (il == ik) {
-                continue;
-            }
+        // (nbatch, 2)
+        // long nbatch = points.size(0);
 
-            for (int64_t im = 0; im < il; ++im) { // Note: original Python had `for im in range(il)`
-                                                // which means im < il.
-                if (im == ik) {
+        // Reshape points to (nbatch, 1, 2) for broadcasting with view data
+        // (nbatch, 1, 2)
+        torch::Tensor points_reshaped = points.unsqueeze(1);
+
+        // Reshape center to (1, Nview, 2) for broadcasting with points
+        // (1, Nview, 2)
+        torch::Tensor center_reshaped = center.unsqueeze(0);
+
+        // Calculate vector from each view's center to each point
+        // Result will be (nbatch, Nview, 2)
+        // (nbatch, 1, 2) - (1, Nview, 2) -> (nbatch, Nview, 2)
+        torch::Tensor vec_center_to_point = points_reshaped - center_reshaped;
+
+        // Reshape pitch_dir to (1, Nview, 2) for broadcasting
+        // (1, Nview, 2)
+        torch::Tensor pitch_dir_reshaped = pitch_dir.unsqueeze(0);
+
+        // Calculate the dot product along the last dimension to get pitches.
+        // This is a batched dot product: sum((nbatch, Nview, 2) * (1, Nview, 2)) over dim 2
+        // Result will be (nbatch, Nview)
+        torch::Tensor pitches = torch::sum(vec_center_to_point * pitch_dir_reshaped, /*dim=*/2);
+
+        return pitches;
+    }
+
+    torch::Tensor Coordinates::point_indices(const torch::Tensor& points) const {
+        // Calculate the floating-point pitch locations for each point in each view
+        // (nbatch, nview)
+        torch::Tensor pitches_per_view = this->point_pitches(points);
+
+        // Get nviews from the calculated pitches_per_view (or self.pitch_mag)
+        // long nviews_val = pitches_per_view.size(1);
+
+        // Reshape pitch_mag to (1, Nview) for broadcasting with pitches_per_view
+        // (nbatch, Nview) / (1, Nview) -> (nbatch, Nview)
+        // Note: self.pitch_mag is (Nview,)
+        torch::Tensor pitch_mag_reshaped = pitch_mag.unsqueeze(0);
+
+        // Calculate pitch indices using the existing pitch_index logic: floor(pitch / pitch_mag)
+        // (nbatch, nview)
+        torch::Tensor indices_float = pitches_per_view / pitch_mag_reshaped;
+
+        // Apply floor and convert to long integer type
+        // (nbatch, nview)
+        torch::Tensor pitch_indices = torch::floor(indices_float).to(torch::kLong);
+
+        return pitch_indices;
+    }
+
+    torch::Tensor Coordinates::ray_crossing(torch::Tensor view1, torch::Tensor ray1,
+                                            torch::Tensor view2, torch::Tensor ray2) const
+    {
+        // Ensure indices are long for indexing
+        view1 = view1.to(torch::kLong);
+        ray1 = ray1.to(torch::kLong);
+        view2 = view2.to(torch::kLong);
+        ray2 = ray2.to(torch::kLong);
+
+        // Use advanced indexing. If view1/view2 are scalar, this will be scalar.
+        // If view1/view2 are 1D tensors, this will result in a batched tensor.
+        torch::Tensor r00 = zero_crossings.index({view1, view2});
+        torch::Tensor w12 = ray_jump.index({view1, view2});
+        torch::Tensor w21 = ray_jump.index({view2, view1});
+
+        // return r00 + ray2 * w12 + ray1 * w21;
+        // Need to unsqueeze ray1 and ray2 to match the dimensions of w12, w21, r00 for broadcasting
+        // If r00, w12, w21 are (..., 2), then ray1/ray2 need to be (..., 1)
+        if (ray1.dim() < r00.dim()) { // Check if ray1/ray2 are scalar or 1D when r00 is 2D or 3D
+            ray1 = ray1.unsqueeze(-1);
+            ray2 = ray2.unsqueeze(-1);
+        }
+
+        return r00 + ray2 * w12 + ray1 * w21;
+    }
+
+    torch::Tensor Coordinates::pitch_location(torch::Tensor view1, torch::Tensor ray1,
+                                              torch::Tensor view2, torch::Tensor ray2,
+                                              torch::Tensor view3) const
+    {
+        // Ensure indices are long for indexing
+        view1 = view1.to(torch::kLong);
+        ray1 = ray1.to(torch::kLong);
+        view2 = view2.to(torch::kLong);
+        ray2 = ray2.to(torch::kLong);
+        view3 = view3.to(torch::kLong);
+
+        // Use advanced indexing.
+        // If view1/view2/view3 are scalar, this will be scalar.
+        // If view1/view2/view3 are 1D tensors, this will result in a batched tensor.
+        torch::Tensor b_val = b.index({view1, view2, view3});
+        torch::Tensor a_val_12 = a.index({view1, view2, view3});
+        torch::Tensor a_val_21 = a.index({view2, view1, view3});
+
+        // std::cerr << "p.loc: ray1.device=" << ray1.device() << " b_val.device=" << b_val.device() << "\n";
+
+        // Ensure ray1 and ray2 are broadcastable with the result of indexing
+        // If b_val, a_val_12, a_val_21 are scalar, ray1/ray2 should remain scalar.
+        // If they are 1D, ray1/ray2 should remain 1D.
+        // return b_val + ray2.to(b_val.dtype()) * a_val_12 + ray1.to(b_val.dtype()) * a_val_21;
+        return b_val +
+            ray2.to(b_val.dtype()).to(b_val.device()) * a_val_12 +
+            ray1.to(b_val.dtype()).to(b_val.device()) * a_val_21;    }
+
+    torch::Tensor Coordinates::pitch_index(const torch::Tensor& pitch_val, const torch::Tensor& view_idx) const {
+        // return torch.floor(pitch/self.pitch_mag[view]).to(torch.long)
+        torch::Tensor view_idx_long = view_idx.to(torch::kLong);
+        torch::Tensor mag_at_view = pitch_mag.index({view_idx_long});
+        return torch::floor(pitch_val / mag_at_view).to(torch::kLong);
+    }
+
+    void Coordinates::init(const torch::Tensor& pitches_user)
+    {
+        // Establish internal and return device/dtype
+        auto device = pitches_user.device();
+        auto FP_dtype = torch::kDouble;
+        auto FP_options = torch::TensorOptions().dtype(FP_dtype).device(device);
+
+        torch::Tensor pitches_in = pitches_user.to(FP_dtype);
+        long nviews_val = pitches_in.size(0);
+
+        // 1D (l) the magnitude of the pitch of view l.
+        // pvrel = pitches[:,1,:] - pitches[:,0,:]
+        torch::Tensor pvrel = pitches_in.index({torch::indexing::Slice(), 1, torch::indexing::Slice()}) -
+            pitches_in.index({torch::indexing::Slice(), 0, torch::indexing::Slice()});
+        // self.pitch_mag = torch.sqrt(pvrel[:,0]**2 + pvrel[:,1]**2)
+        pitch_mag = torch::sqrt(torch::pow(pvrel.index({torch::indexing::Slice(), 0}), 2) +
+                                torch::pow(pvrel.index({torch::indexing::Slice(), 1}), 2));
+
+        // 2D (l,c) the pitch direction 2D coordinates c of view l.
+        // self.pitch_dir = pvrel / self.pitch_mag.reshape(5,1)
+        // Assuming nviews is 5 for the reshape, but it should be dynamic
+        pitch_dir = pvrel / pitch_mag.reshape({nviews_val, 1});
+
+        // 2D (l,c) the 2D coordinates c of the origin point of view l
+        // self.center = pitches[:,0,:]
+        center = pitches_in.index({torch::indexing::Slice(), 0, torch::indexing::Slice()});
+
+        // self.ray_dir = torch.vstack((-self.pitch_dir[:,1], self.pitch_dir[:,0])).T
+        ray_dir = torch::stack({
+                -pitch_dir.index({torch::indexing::Slice(), 1}),
+                pitch_dir.index({torch::indexing::Slice(), 0})}).transpose(0, 1);
+
+        // ray0 = torch.vstack((self.center - self.ray_dir, self.center + self.ray_dir)).reshape(2,-1,2)
+        torch::Tensor ray0_part1 = center - ray_dir;
+        torch::Tensor ray0_part2 = center + ray_dir;
+        torch::Tensor ray0 = torch::stack({ray0_part1, ray0_part2}).reshape({2, -1, 2});
+
+        // ray1 = torch.vstack((ray0[0] + pvrel, ray0[1] + pvrel)).reshape(2,-1,2)
+        torch::Tensor ray1_part1 = ray0.index({0}) + pvrel;
+        torch::Tensor ray1_part2 = ray0.index({1}) + pvrel;
+        torch::Tensor ray1 = torch::stack({ray1_part1, ray1_part2}).reshape({2, -1, 2});
+
+        // 3D (l,m,c) crossing point 2D coordinates c of "ray 0" of views l and m.
+        zero_crossings = torch::zeros({nviews_val, nviews_val, 2}, FP_options);
+
+        // 3D (l,m,c) difference vector coordinates c between two consecutive
+        // m-view crossings along l ray direction.  between crossings of rays of view m.
+        ray_jump = torch::zeros({nviews_val, nviews_val, 2}, FP_options);
+
+        // The Ray Grid tensor representations.
+        a = torch::zeros({nviews_val, nviews_val, nviews_val}, FP_options);
+        b = torch::zeros({nviews_val, nviews_val, nviews_val}, FP_options);
+
+        // Cross-view things
+        for (long il = 0; il < nviews_val; ++il) {
+            torch::Tensor rl0 = ray0.index({torch::indexing::Slice(), il, torch::indexing::Slice()});
+            torch::Tensor rl1 = ray1.index({torch::indexing::Slice(), il, torch::indexing::Slice()});
+
+            for (long im = 0; im < nviews_val; ++im) {
+                torch::Tensor rm0 = ray0.index({torch::indexing::Slice(), im, torch::indexing::Slice()});
+                torch::Tensor rm1 = ray1.index({torch::indexing::Slice(), im, torch::indexing::Slice()});
+
+                // Special case diagonal values
+                if (il == im) {
+                    // self.zero_crossings[il,im] = self.center[il]
+                    zero_crossings.index_put_({il, im}, center.index({il}));
+                    // self.ray_jump[il,im] = funcs.ray_direction(rl0)
+                    ray_jump.index_put_({il, im}, ray_direction(rl0));
                     continue;
                 }
-                
-                // zero_crossings[il, im] is a 2D vector, pk is a 2D vector. Dot product returns a scalar tensor.
-                double rlmpk = torch::dot(zero_crossings.index({il, im}), pk).item<double>();
-                double wlmpk = torch::dot(ray_jump.index({il, im}), pk).item<double>();
-                double wmlpk = torch::dot(ray_jump.index({im, il}), pk).item<double>();
-                
-                a.index_put_({il, im, ik}, wlmpk);
-                a.index_put_({im, il, ik}, wmlpk); // Python's a[im,il,ik] = wmlpk;
-                b.index_put_({il, im, ik}, rlmpk - cp);
-                b.index_put_({im, il, ik}, rlmpk - cp); // Python's b[im,il,ik] = rlmpk - cp
+
+                if (il < im) {
+                    // Fill in both triangles in one go to exploit the symmetry of this:
+                    try {
+                        torch::Tensor p = crossing(rl0, rm0);
+                        zero_crossings.index_put_({il, im}, p);
+                        zero_crossings.index_put_({im, il}, p);
+                        ray_jump.index_put_({il, im}, crossing(rl0, rm1) - p);
+                        ray_jump.index_put_({im, il}, crossing(rm0, rl1) - p);
+                    } catch (const std::runtime_error& e) {
+                        // Python: print(f'skipping parallel view pair: {il=} {im=}')
+                        // In C++, we'll just print to stderr or a log.
+                        std::cerr << "skipping parallel view pair: il=" << il << " im=" << im << ": " << e.what() << std::endl;
+
+                    }
+                }
+            }
+        }
+
+        // Triple layer things
+        for (long ik = 0; ik < nviews_val; ++ik) {
+            torch::Tensor pk = pitch_dir.index({ik});
+            torch::Tensor cp = torch::dot(center.index({ik}), pk);
+
+            for (long il = 0; il < nviews_val; ++il) {
+                if (il == ik) {
+                    continue;
+                }
+
+                for (long im = 0; im < il; ++im) {
+                    if (im == ik) {
+                        continue;
+                    }
+
+                    torch::Tensor rlmpk = torch::dot(zero_crossings.index({il, im}), pk);
+                    torch::Tensor wlmpk = torch::dot(ray_jump.index({il, im}), pk);
+                    torch::Tensor wmlpk = torch::dot(ray_jump.index({im, il}), pk);
+
+                    a.index_put_({il, im, ik}, wlmpk);
+                    a.index_put_({im, il, ik}, wmlpk);
+                    b.index_put_({il, im, ik}, rlmpk - cp);
+                    b.index_put_({im, il, ik}, rlmpk - cp);
+                }
             }
         }
     }
-}
 
 
-} // namespace RayGrid
-} // namespace Spng
-} // namespace WireCell
+    torch::Tensor Coordinates::active_bounds() const
+    {
+        auto ab = torch::zeros({nviews(), 2}, torch::kLong);
+        ab.index_put_({0,0}, 0);
+        ab.index_put_({0,1}, 1);
+        ab.index_put_({1,0}, 0);
+        ab.index_put_({1,1}, 1);
+
+        auto idx0 = torch::zeros({1,}, torch::kLong);
+        auto idx1 = torch::ones({1,}, torch::kLong);
+
+        // this could perhaps be more clever...
+        for (int64_t view_idx = 2; view_idx < nviews(); ++view_idx) {
+            auto view3 = torch::tensor({view_idx}, torch::kLong);
+            auto i1 = pitch_index(pitch_location(idx0,idx0, idx1,idx0, view3), view3).item<int64_t>();
+            auto i2 = pitch_index(pitch_location(idx0,idx1, idx1,idx1, view3), view3).item<int64_t>();
+            if (i1 < i2) {
+                ab.index_put_({view_idx,0}, i1);
+                ab.index_put_({view_idx,1}, i2+1); // half-open
+            }
+            else {
+                ab.index_put_({view_idx,0}, i2);
+                ab.index_put_({view_idx,1}, i1+1); // half-open
+            }
+        }
+
+        return ab;
+    }
+
+
+
+} // namespace RayGrid::Spng::WireCell

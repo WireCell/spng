@@ -64,3 +64,12 @@ An example for how ~PREFIX~ may be defined is at:
 https://www.phy.bnl.gov/~bviren/wire-cell/docs/wcwc-howto.html#spack-view-wct
 
 Torch is a bit weirdly installed.  Besides its prefix (~TDIR~) being deep under ~$PREFIX~ in the Python-related files, it requires *two* include directories, one inside the other, to be specified.
+
+* Testing
+
+Tests are in ~spng/tests/{doctest,test,check}_*.*~ following WCT's testing support.
+
+#+begin_example
+$ ./build/spng/wcdoctest-spng
+$ ./build/spng/check_raytiling_speed [cpu|gpu] [yes|no] [seed]
+#+end_example
