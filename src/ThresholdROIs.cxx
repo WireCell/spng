@@ -25,8 +25,10 @@ void WireCell::SPNG::ThresholdROIs::configure(const WireCell::Configuration& con
     m_output_set_tag = get(config, "output_set_tag", m_output_set_tag);
     m_output_tensor_tag = get(config, "output_tensor_tag", m_output_tensor_tag);
     m_unsqueeze_input = get(config, "unsqueeze_input", m_unsqueeze_input);
+    m_threshold_rms_factor = get(config, "threshold_rms_factor", m_threshold_rms_factor);
     log->debug("Will tag with Set:{} Tensor:{}", m_output_set_tag.asString(),
                m_output_tensor_tag.asString());
+    log->debug("Will find ROIs with threshold_rms_factor {}", m_threshold_rms_factor);
 }
 
 bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_pointer& out) {
@@ -73,6 +75,7 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
         (torch::cuda::is_available() && !m_debug_force_cpu) ? torch::kCUDA : torch::kCPU
     ));
     nantensor = nantensor.to(device);
+    // log->debug("nan device: {} input device: {}", nantensor.device(), tensor_clone.device());
     auto no_outliers = torch::where(torch::abs(tensor_clone - median) < 500., tensor_clone, nantensor);
     auto baseline = std::get<0>(torch::nanmedian(
         no_outliers, 2, true
@@ -87,7 +90,11 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
     for (const auto & s : rms_vals.sizes()) {
         log->debug("shape {}", s);
     }
-    tensor_clone = torch::where(tensor_clone > 3*rms_vals, tensor_clone, torch::zeros({1}).to(device));
+    tensor_clone = torch::where(
+        (tensor_clone > m_threshold_rms_factor*rms_vals),
+        tensor_clone,
+        torch::zeros({1}).to(device)
+    );
 
     if (m_unsqueeze_input)
         tensor_clone = torch::squeeze(tensor_clone, 0);

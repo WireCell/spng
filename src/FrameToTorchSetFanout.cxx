@@ -143,7 +143,6 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         accessors.push_back(tensors.back().accessor<double,2>());
     }
 
-    
 
     //Now loop over the traces from the input frame, get where the output should go,
     //and put into the temp vector

@@ -4,7 +4,7 @@ local g = import 'pgraph.jsonnet';
 local wc = import 'wirecell.jsonnet';
 local spng_filters = import 'spng_filters.jsonnet';
 
-function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
+function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false, do_run_roi=false) {
     // make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
 
         local filter_settings = {
@@ -122,6 +122,8 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                 name: 'spng_threshold_rois_apa%d_plane%d' % [anode.data.ident, iplane],
                 data: {
                     unsqueeze_input: false,
+                    threshold_rms_factor: 3.0,
+                    debug_force_cpu: debug_force_cpu,
                 }
             },
             nin=1, nout=1, uses=[]),
@@ -609,15 +611,16 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                 name: 'spng_threshold_rois_plane%d' % iplane,
                 data: {
                     unsqueeze_input: false,
+                    threshold_rms_factor: 3.0,
+                    debug_force_cpu: debug_force_cpu,
                 }
             },
             nin=1, nout=1, uses=[]) for iplane in std.range(0,2)],
             
-            ret : g.intern(
-                innodes=[fans_to_stacks],
-                centernodes=torch_to_tensors + spng_decons + spng_gaus_apps + apply_loose_rois + threshold_rois,
-                outnodes=tensor_sinks,
-                edges = [
+            // local run_roi = false,
+            local centers = torch_to_tensors + spng_decons + 
+                    spng_gaus_apps + apply_loose_rois + (if do_run_roi then threshold_rois else []), 
+            local edges = [
                     g.edge(fans_to_stacks, spng_decons[0], 0),
                     g.edge(fans_to_stacks, spng_decons[1], 1),
                     g.edge(fans_to_stacks, spng_decons[2], 2),
@@ -629,7 +632,7 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                     g.edge(spng_gaus_apps[0], apply_loose_rois[0]),
                     g.edge(spng_gaus_apps[1], apply_loose_rois[1]),
                     g.edge(spng_gaus_apps[2], apply_loose_rois[2]),
-
+                ] + (if do_run_roi then [
                     g.edge(apply_loose_rois[0], threshold_rois[0]),
                     g.edge(apply_loose_rois[1], threshold_rois[1]),
                     g.edge(apply_loose_rois[2], threshold_rois[2]),
@@ -637,11 +640,20 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                     g.edge(threshold_rois[0], torch_to_tensors[0]),
                     g.edge(threshold_rois[1], torch_to_tensors[1]),
                     g.edge(threshold_rois[2], torch_to_tensors[2]),
-
+                ] else [
+                    g.edge(apply_loose_rois[0], torch_to_tensors[0]),
+                    g.edge(apply_loose_rois[1], torch_to_tensors[1]),
+                    g.edge(apply_loose_rois[2], torch_to_tensors[2]),
+                ]) + [
                     g.edge(torch_to_tensors[0], tensor_sinks[0]),
                     g.edge(torch_to_tensors[1], tensor_sinks[1]),
                     g.edge(torch_to_tensors[2], tensor_sinks[2]),
                 ],
+            ret : g.intern(
+                innodes=[fans_to_stacks],
+                centernodes=centers,
+                outnodes=tensor_sinks,
+                edges=edges,
             ),
         }.ret,
 }

@@ -123,6 +123,7 @@ local torch_nodes = torch_maker(
   apply_gaus=(std.extVar("ApplyGaus") == 1),
   do_roi_filters=(std.extVar("ROI") == 1),
   do_collate_apa=(std.extVar("CollateAPAs") == 1),
+  do_run_roi=(std.extVar("RunROI") == 1),
 );
 local spng_decons = torch_nodes.spng_decons;
 local spng_stacked = torch_nodes.stacked_spng;
