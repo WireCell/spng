@@ -432,6 +432,16 @@ namespace WireCell::Spng::RayGrid {
     torch::Tensor
     apply_activity(const Coordinates& coords, const torch::Tensor& blobs_in,
                    const torch::Tensor& activity) {
+        torch::Tensor lo, hi;
+        std::tie(lo, hi) = retrieve_new_blob_bounds(coords, blobs_in, activity);
+        torch::Tensor new_blobs = expand_blobs_with_activity(blobs_in, lo, hi, activity);
+
+        return new_blobs;
+    }
+
+    std::tuple<torch::Tensor, torch::Tensor>
+    retrieve_new_blob_bounds(const Coordinates& coords, const torch::Tensor& blobs_in,
+                        const torch::Tensor& activity) {
         long nviews = blobs_in.size(1);
 
         torch::Tensor crossings = blob_crossings(blobs_in);
@@ -439,10 +449,9 @@ namespace WireCell::Spng::RayGrid {
         torch::Tensor lo, hi;
         std::tie(lo, hi) = blob_bounds(coords, crossings, nviews, insides);
 
-        std::tie(lo, hi) = bounds_clamp(lo, hi, activity.size(0));
-        torch::Tensor new_blobs = expand_blobs_with_activity(blobs_in, lo, hi, activity);
+        auto results = bounds_clamp(lo, hi, activity.size(0));
 
-        return new_blobs;
+        return results;
     }
 
 

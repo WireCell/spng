@@ -207,6 +207,18 @@ namespace WireCell::Spng::RayGrid {
                    const torch::Tensor& activity);
 
 
+    /**
+     * @brief Applies activity to blobs to make new blobs with one more view.
+     * @param coords The Coordinates object.
+     * @param blobs The existing blobs tensor.
+     * @param activity A 1D boolean tensor representing the new view's activity.
+     * @return The half-open bounds which correspond to the new blobs which would be 
+     * returned -- this is used within apply_activity
+     */
+    std::tuple<torch::Tensor, torch::Tensor>
+    retrieve_new_blob_bounds(const Coordinates& coords, const torch::Tensor& blobs,
+                        const torch::Tensor& activity);
+
 } // namespace WireCell::Spng::RayGrid
 
 #endif // WIRECELL_SPNG_RAYGRID_RAYTILING_H
