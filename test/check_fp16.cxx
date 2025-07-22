@@ -85,13 +85,13 @@ int main(int argc, const char* argv[])
     torch::jit::script::Module module;
     // Deserialize the ScriptModule from a file using torch::jit::load().
     auto start = std::chrono::high_resolution_clock::now();
-    torch::Device device = torch::Device(torch::kCUDA,0);
-    module = torch::jit::load(mname, device);
-    module.to(at::kCUDA, dtype);
+    //torch::Device device = torch::Device(torch::kCUDA,0);
+    //module = torch::jit::load(mname, device);
+    //module.to(at::kCUDA, dtype);
     torch::TensorOptions options = torch::TensorOptions().dtype(dtype);
     torch::Tensor iten = torch::rand({1, 3, 800, 600}, options);
     std::vector<torch::IValue> itens {iten};
-    auto otens = module.forward(itens).toTensor();
+    //auto otens = module.forward(itens).toTensor();
     std::vector<torch::IValue> inputs = {iten};
     ITorchTensorSet::pointer iitens = to_itensor(inputs);
     auto oitens = torch_service->forward(iitens);
