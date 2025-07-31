@@ -6,7 +6,8 @@
 #include "WireCellSpng/ITorchTensorSetFilter.h"
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellSpng/ITorchSpectrum.h"
-
+#include "WireCellSpng/RayGrid.h"
+#include "WireCellIface/IAnodePlane.h"
 
 
 namespace WireCell {
@@ -28,6 +29,18 @@ namespace SPNG {
         int m_target_plane_index{0};
         int m_aux_plane_l_index{1};
         int m_aux_plane_m_index{2};
+        bool m_debug_force_cpu{false};
+        double m_readout_plane_width{100.},
+               m_readout_plane_height{100.},
+               m_pitch{5.},
+               m_angle_in_radians{0.6230825}; //35.7deg
+        
+        torch::Tensor m_trivial_blobs;
+        std::vector<torch::Tensor> m_raygrid_views;
+        std::string m_anode_tn{"AnodePlane"};
+        IAnodePlane::pointer m_anode;
+
+        
     };
 }
 }

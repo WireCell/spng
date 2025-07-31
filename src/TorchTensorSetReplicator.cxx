@@ -25,7 +25,6 @@ WireCell::Configuration SPNG::TorchTensorSetReplicator::default_configuration() 
 
 void SPNG::TorchTensorSetReplicator::configure(const WireCell::Configuration& config)
 {
-    //Get the anode to make a channel map for output
     m_multiplicity = get(config, "multiplicity", m_multiplicity);
 }
 
