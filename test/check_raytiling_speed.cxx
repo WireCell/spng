@@ -59,6 +59,11 @@ int main(int argc, char* argv[])
         torch::manual_seed(random_seed);
     }
 
+    int nblobs = 1000;
+    if (argc > 4) {
+        nblobs = std::atoi(argv[4]);
+    }
+
     std::cerr << "Device=" << device << " autograd='" << use_autograd << "', random seed='" << random_name << "'\n";
 
     Stopwatch sw;
@@ -83,7 +88,7 @@ int main(int argc, char* argv[])
     coords.to(device);
     std::cerr << "Moved coordinates to device " << sw.restart() << " us\n";
 
-    auto points = random_groups(5, 10, gaussian, {0.0, 0.0}, {width, height});
+    auto points = random_groups(nblobs, 10, gaussian, {0.0, 0.0}, {width, height});
     std::cerr << "Made points in " << sw.restart() << " us, points.shape=" << points.sizes() << "\n";
 
     //   auto x = torch::ones({3, 3});
@@ -99,6 +104,14 @@ int main(int argc, char* argv[])
     auto activities = fill_activity(coords, points);
     assert(activities.size() == 5);
     std::cerr << "Made activities in " << sw.restart() << " us\n";
+    
+    for (size_t iview = 0; iview < activities.size(); ++iview) {
+        auto bytes = torch::pickle_save(activities[iview]);
+        std::string name = "activities" + std::to_string(iview) + ".zip"; 
+        std::ofstream fout(name, std::ios::out | std::ios::binary);
+        fout.write(bytes.data(), bytes.size());
+        fout.close();
+    }
 
     // activities[2].index_put_({torch::indexing::Slice()}, 0); //torch::Tensor(0)
     // activities[2].index_put_({100}, 1);
