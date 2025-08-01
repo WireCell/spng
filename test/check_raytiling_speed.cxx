@@ -1,6 +1,7 @@
 #include "WireCellSpng/RayTiling.h"
 #include "WireCellSpng/RayTest.h"
 #include "WireCellSpng/Stopwatch.h"
+#include <fstream>
 
 using namespace WireCell::Spng::RayGrid;
 
@@ -66,6 +67,14 @@ int main(int argc, char* argv[])
     assert(views.size(0) == 5);
     
     std::cerr << "Made symmetric views in " << sw.restart() << " us\n";;
+    std::cout << views << std::endl;
+
+    {
+        auto bytes = torch::pickle_save(views);
+        std::ofstream fout("views.zip", std::ios::out | std::ios::binary);
+        fout.write(bytes.data(), bytes.size());
+        fout.close();
+    }
 
     Coordinates coords(views);
     std::cerr << "Made coordinates " << sw.restart() << " us\n";
@@ -74,8 +83,15 @@ int main(int argc, char* argv[])
     coords.to(device);
     std::cerr << "Moved coordinates to device " << sw.restart() << " us\n";
 
-    auto points = random_groups(1000, 10, gaussian, {0.0, 0.0}, {width, height});
+    auto points = random_groups(5, 10, gaussian, {0.0, 0.0}, {width, height});
     std::cerr << "Made points in " << sw.restart() << " us, points.shape=" << points.sizes() << "\n";
+
+    //   auto x = torch::ones({3, 3});
+    auto bytes = torch::pickle_save(points);
+    std::ofstream fout("random_points.zip", std::ios::out | std::ios::binary);
+    fout.write(bytes.data(), bytes.size());
+    fout.close();
+    // torch::save(points, "random_points.pt");
 
     points = points.to(device);
     std::cerr << "Moved points to device " << sw.restart() << " us\n";
@@ -84,17 +100,35 @@ int main(int argc, char* argv[])
     assert(activities.size() == 5);
     std::cerr << "Made activities in " << sw.restart() << " us\n";
 
+    // activities[2].index_put_({torch::indexing::Slice()}, 0); //torch::Tensor(0)
+    // activities[2].index_put_({100}, 1);
+    // auto view_2_acc = activities[2].accessor<bool, 1>();
+
     const size_t ntries = 1001;
     for (size_t tries = 0; tries < ntries; ++tries) {
         auto blobs = trivial_blobs().to(device);
-        if (!tries) {
-            std::cerr << "trivial has " << blobs.size(0) << " blobs\n";
-        }
+        // if (!tries) {
+        //     std::cerr << "trivial has " << blobs.size(0) << " blobs\n";
+        // }
         for (size_t view = 2; view < 5; ++view) {
             auto activity = activities[view].to(device);
+            // if (!tries && view == 2) {
+            //     std::cout << activity.sizes() << std::endl;
+            //     // std::cout << activity << std::endl;
+            // }
             blobs = apply_activity(coords, blobs, activity);
+            // if(!tries)
+            //     std::cout << blobs << std::endl;
             if (!tries) {
                 std::cerr << "view " << view << " has " << blobs.size(0) << " blobs\n";
+                // if (view < 4) {
+                //     std::cerr << blobs << std::endl;
+                // }
+                // torch::save(blobs, "solved_blobs.pt");
+                auto bytes = torch::pickle_save(blobs);
+                std::ofstream fout("solved_blobs.zip", std::ios::out | std::ios::binary);
+                fout.write(bytes.data(), bytes.size());
+                fout.close();
             }
             assert (blobs.size(0) > 0);
         }            
