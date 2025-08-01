@@ -733,13 +733,17 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                 g.edge(fans_to_stacks, spng_decons[1], 1),
                 g.edge(fans_to_stacks, spng_decons[2], 2),
 
-                g.edge(spng_decons[0], spng_gaus_apps[0]),
-                g.edge(spng_decons[1], spng_gaus_apps[1]),
-                g.edge(spng_decons[2], spng_gaus_apps[2]),
+                // g.edge(spng_decons[0], spng_gaus_apps[0]),
+                // g.edge(spng_decons[1], spng_gaus_apps[1]),
+                // g.edge(spng_decons[2], spng_gaus_apps[2]),
 
-                g.edge(spng_gaus_apps[0], apply_loose_rois[0]),
-                g.edge(spng_gaus_apps[1], apply_loose_rois[1]),
-                g.edge(spng_gaus_apps[2], apply_loose_rois[2]),
+                // g.edge(spng_gaus_apps[0], apply_loose_rois[0]),
+                // g.edge(spng_gaus_apps[1], apply_loose_rois[1]),
+                // g.edge(spng_gaus_apps[2], apply_loose_rois[2]),
+
+                g.edge(spng_decons[0], apply_loose_rois[0]),
+                g.edge(spng_decons[1], apply_loose_rois[1]),
+                g.edge(spng_decons[2], apply_loose_rois[2]),
 
                 g.edge(apply_loose_rois[0], threshold_rois[0]),
                 g.edge(apply_loose_rois[1], threshold_rois[1]),
@@ -764,13 +768,17 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                     g.edge(fans_to_stacks, spng_decons[1], 1),
                     g.edge(fans_to_stacks, spng_decons[2], 2),
 
-                    g.edge(spng_decons[0], spng_gaus_apps[0]),
-                    g.edge(spng_decons[1], spng_gaus_apps[1]),
-                    g.edge(spng_decons[2], spng_gaus_apps[2]),
+                    // g.edge(spng_decons[0], spng_gaus_apps[0]),
+                    // g.edge(spng_decons[1], spng_gaus_apps[1]),
+                    // g.edge(spng_decons[2], spng_gaus_apps[2]),
 
-                    g.edge(spng_gaus_apps[0], apply_loose_rois[0]),
-                    g.edge(spng_gaus_apps[1], apply_loose_rois[1]),
-                    g.edge(spng_gaus_apps[2], apply_loose_rois[2]),
+                    // g.edge(spng_gaus_apps[0], apply_loose_rois[0]),
+                    // g.edge(spng_gaus_apps[1], apply_loose_rois[1]),
+                    // g.edge(spng_gaus_apps[2], apply_loose_rois[2]),
+
+                    g.edge(spng_decons[0], apply_loose_rois[0]),
+                    g.edge(spng_decons[1], apply_loose_rois[1]),
+                    g.edge(spng_decons[2], apply_loose_rois[2]),
 
                     g.edge(apply_loose_rois[0], threshold_rois[0]),
                     g.edge(apply_loose_rois[1], threshold_rois[1]),

@@ -127,7 +127,7 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
     for (auto & v : m_raygrid_views) v = v.to(device);
     // m_raygrid_views = m_raygrid_views.to(device);
 
-    std::cout << m_raygrid_views[0] << std::endl;
+    // std::cout << m_raygrid_views[0] << std::endl;
 
     std::vector<WireCell::Spng::RayGrid::Coordinates> m_raygrid_coords;
     for (auto & v : m_raygrid_views) {
@@ -154,16 +154,16 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
 
     target_tensor_n = pool(target_tensor_n);
 
-    std::cout << aux_tensor_l.sizes() << std::endl;
-    std::cout << aux_tensor_m.sizes() << std::endl;
-    std::cout << target_tensor_n.sizes() << std::endl;
+    // std::cout << aux_tensor_l.sizes() << std::endl;
+    // std::cout << aux_tensor_m.sizes() << std::endl;
+    // std::cout << target_tensor_n.sizes() << std::endl;
 
     //Apply the first two 'real' layers -- the order doesn't matter?
     auto coords = m_raygrid_coords[0]; // For testing -- just one side of the APA
 
-    std::cout << "Trivial Blobs" << m_trivial_blobs << std::endl;
+    // std::cout << "Trivial Blobs" << m_trivial_blobs << std::endl;
     for (long int irow = 0; irow < aux_tensor_l.sizes().back(); ++irow) {
-        std::cout << "Row: " << irow << std::endl;
+        // std::cout << "Row: " << irow << std::endl;
         auto l_row = aux_tensor_l.index({0, torch::indexing::Slice(), irow});
         auto m_row = aux_tensor_m.index({0, torch::indexing::Slice(), irow});
         auto target_row = target_tensor_n.index({0, torch::indexing::Slice(), irow});
@@ -180,16 +180,16 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
         // std::cout << target_row << std::endl;
 
         auto blobs = WireCell::Spng::RayGrid::apply_activity(coords, m_trivial_blobs, l_row);
-        std::cout << "First layer done" << std::endl;
-        std::cout << blobs.sizes() << std::endl;
+        // std::cout << "First layer done" << std::endl;
+        // std::cout << blobs.sizes() << std::endl;
         if (blobs.size(0) == 0) {
-            std::cout << "Found no blobs. Moving on" << std::endl;
+            // std::cout << "Found no blobs. Moving on" << std::endl;
             continue;
         }
         blobs = WireCell::Spng::RayGrid::apply_activity(coords, blobs, m_row);
-        std::cout << "Second layer done" << std::endl;
+        // std::cout << "Second layer done" << std::endl;
         if (blobs.size(0) == 0) {
-            std::cout << "Found no blobs. Moving on" << std::endl;
+            // std::cout << "Found no blobs. Moving on" << std::endl;
             continue;
         }
 
@@ -204,7 +204,7 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
             );
 
             // auto mp3_accessor = mp3_blobs.accessor<long, 3>();
-            std::cout << "MP3 Blobs: " << mp3_blobs.sizes() << std::endl;
+            // std::cout << "MP3 Blobs: " << mp3_blobs.sizes() << std::endl;
             for (int iblob = 0; iblob < mp3_blobs.size(0); ++iblob) {
                 // std::cout << mp3_accessor[iblob][4][0] << " " << mp3_accessor[iblob][4][1] << std::endl;
                 output_tensor_active.index_put_(
@@ -230,10 +230,10 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
             );
             
             // auto mp2_accessor = mp2_blobs.accessor<long, 3>();
-            std::cout << "MP2 Blobs: " << mp2_blobs.sizes() << std::endl;
-            std::cout << mp2_blobs << std::endl;
+            // std::cout << "MP2 Blobs: " << mp2_blobs.sizes() << std::endl;
+            // std::cout << mp2_blobs << std::endl;
             for (int iblob = 0; iblob < mp2_blobs.size(0); ++iblob) {
-                std::cout << iblob << std::endl;
+                // std::cout << iblob << std::endl;
                 // std::cout << mp2_accessor[iblob][4][0] << " " << mp2_accessor[iblob][4][1] << std::endl;
                 output_tensor_inactive.index_put_(
                     {
