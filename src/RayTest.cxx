@@ -358,12 +358,16 @@ std::vector<torch::Tensor> fill_activity(const Coordinates& coords, const torch:
     // Shape (num_points, nviews)
     torch::Tensor all_pitch_indices = coords.point_indices(flattened_points);
 
+    std::cerr << "indices: " << all_pitch_indices << "\n";
+
     // Use the torch::indexing namespace for Slice and Ellipsis
     using namespace torch::indexing;
 
     auto bogus = torch::zeros({}, points.options().dtype(torch::kBool));
 
     auto ab = coords.active_bounds();
+
+    std::cerr << "active bounds: " << ab << "\n";
         
     // Iterate through each view to fill its individual activity tensor
     for (int64_t view_idx = 0; view_idx < nviews; ++view_idx) {
@@ -385,16 +389,25 @@ std::vector<torch::Tensor> fill_activity(const Coordinates& coords, const torch:
             continue; // Move to the next view
         }
         
-        // Calculate the minimum and maximum pitch indices encountered for this view.
-        const int64_t min_idx = std::max(0L, current_view_indices.min().item<int64_t>());
-        const int64_t max_idx = std::max(0L, current_view_indices.max().item<int64_t>());
+        {
+            // Calculate the minimum and maximum pitch indices encountered for
+            // this view as a check, bail if activity is bogus.
+            const int64_t min_idx = std::max(0L, current_view_indices.min().item<int64_t>());
+            const int64_t max_idx = std::max(0L, current_view_indices.max().item<int64_t>());
 
-        // Possible that both were negative, ie points outside bounds
-        if (min_idx >= max_idx) {
-            activity_tensors.push_back(bogus);
-            std::cerr << "fill_activity: all points miss in view " << view_idx << "\n";
-            continue; // Move to the next view
-        }
+            // Possible that both were negative, ie all points are outside bounds
+            if (max_idx < 0) {
+                activity_tensors.push_back(bogus);
+                std::cerr << "fill_activity: all points below view " << view_idx << " minmax=["<<min_idx<<","<<max_idx<<"]\n";
+                continue; // Move to the next view
+            }
+            if (min_idx > max_idx) {
+                activity_tensors.push_back(bogus);
+                std::cerr << "fill_activity: all points miss in view " << view_idx << " minmax=["<<min_idx<<","<<max_idx<<"]\n";
+                continue; // Move to the next view
+            }
+        }        
+
         int64_t activity_tensor_size = b_end; // b_end is "hi" side of half-open range
 
         // Create the activity tensor initialized to False (all zeros for bool)
