@@ -2,6 +2,7 @@
 #include "WireCellSpng/RayTiling.h"
 #include "WireCellSpng/RayGrid.h" // For WireCell::Spng::RayGrid::Coordinates
 #include "WireCellSpng/RayTest.h"
+
 #include <iostream>
 #include <limits> // For std::numeric_limits
 

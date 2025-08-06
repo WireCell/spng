@@ -341,6 +341,8 @@ namespace WireCell::Spng::RayGrid {
     torch::Tensor Coordinates::active_bounds() const
     {
         auto ab = torch::zeros({nviews(), 2}, torch::kLong);
+        
+        //Setting the first 2 virtual/trivial layers by hand
         ab.index_put_({0,0}, 0);
         ab.index_put_({0,1}, 1);
         ab.index_put_({1,0}, 0);
@@ -350,18 +352,32 @@ namespace WireCell::Spng::RayGrid {
         auto idx1 = torch::ones({1,}, torch::kLong);
 
         // this could perhaps be more clever...
+        // Loop over the next 3 (real) views.
         for (int64_t view_idx = 2; view_idx < nviews(); ++view_idx) {
             auto view3 = torch::tensor({view_idx}, torch::kLong);
+
+            //Get the indices of the ray passing by each corner.
+            //The min and max of these will define the active bounds in the given view
+            //
+            //Note: the naming here does not necessarily reflect the actual locations,
+            //      but this method is symmetric under cyclic permutation
+
+            //Lower left corner
             auto i1 = pitch_index(pitch_location(idx0,idx0, idx1,idx0, view3), view3).item<int64_t>();
+            //Upper right corner
             auto i2 = pitch_index(pitch_location(idx0,idx1, idx1,idx1, view3), view3).item<int64_t>();
-            if (i1 < i2) {
-                ab.index_put_({view_idx,0}, i1);
-                ab.index_put_({view_idx,1}, i2+1); // half-open
-            }
-            else {
-                ab.index_put_({view_idx,0}, i2);
-                ab.index_put_({view_idx,1}, i1+1); // half-open
-            }
+            //Upper left corner
+            auto i3 = pitch_index(pitch_location(idx0,idx0, idx1,idx1, view3), view3).item<int64_t>();
+            //Lower right corner
+            auto i4 = pitch_index(pitch_location(idx0,idx1, idx1,idx0, view3), view3).item<int64_t>();
+
+            //Get min and max
+            auto min_index = std::min({i1, i2, i3, i4});
+            auto max_index = std::max({i1, i2, i3, i4});
+
+            //Set the half-open active bounds for this view
+            ab.index_put_({view_idx, 0}, min_index);
+            ab.index_put_({view_idx, 1}, max_index+1);
         }
 
         return ab;
