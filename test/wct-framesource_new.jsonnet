@@ -1,19 +1,19 @@
-# usage: wire-cell -l stdout wct-sim-check.jsonnet
+function(input_file='tensor_frames.npz', skip_noise='False') {# usage: wire-cell -l stdout wct-sim-check.jsonnet
 
-local g = import 'pgraph.jsonnet';
-local f = import 'pgrapher/common/funcs.jsonnet';
-local wc = import 'wirecell.jsonnet';
+local g = import 'pgraph.jsonnet',
+local f = import 'pgrapher/common/funcs.jsonnet',
+local wc = import 'wirecell.jsonnet',
 
-local io = import 'pgrapher/common/fileio.jsonnet';
-local fileio = import 'layers/high/fileio.jsonnet';
-local tools_maker = import 'pgrapher/common/tools.jsonnet';
+local io = import 'pgrapher/common/fileio.jsonnet',
+local fileio = import 'layers/high/fileio.jsonnet',
+local tools_maker = import 'pgrapher/common/tools.jsonnet',
 
-local base = import 'perfect_pdhd/simparams.jsonnet';
-local sim_maker = import 'perfect_pdhd/sim.jsonnet';
-local perfect = import 'perfect_pdhd/chndb-base.jsonnet';
-local nf_maker = import 'perfect_pdhd/nf.jsonnet';
-local sp_maker = import 'perfect_pdhd/sp.jsonnet';
-local magoutput = 'protodunehd-sim-check.root';
+local base = import 'perfect_pdhd/simparams.jsonnet',
+local sim_maker = import 'perfect_pdhd/sim.jsonnet',
+local perfect = import 'perfect_pdhd/chndb-base.jsonnet',
+local nf_maker = import 'perfect_pdhd/nf.jsonnet',
+local sp_maker = import 'perfect_pdhd/sp.jsonnet',
+local magoutput = 'protodunehd-sim-check.root',
 
 local params = base {
   lar: super.lar {
@@ -24,29 +24,29 @@ local params = base {
         lifetime : 50*wc.ms,
         drift_speed : 1.565*wc.mm/wc.us,
   },
-};
+},
 
-local tools = tools_maker(params);
+local tools = tools_maker(params),
 
-local sim = sim_maker(params, tools);
+local sim = sim_maker(params, tools),
 
-local nanodes = std.length(tools.anodes);
-local anode_iota = std.range(0, nanodes-1);
-local anode_idents = [anode.data.ident for anode in tools.anodes];
+local nanodes = std.length(tools.anodes),
+local anode_iota = std.range(0, nanodes-1),
+local anode_idents = [anode.data.ident for anode in tools.anodes],
 
-local output = 'wct-sim-ideal-sigproc.npz';
-local drifter = sim.drifter;
-local bagger = sim.make_bagger();
-local sn_pipes = sim.splusn_pipelines;
+local output = 'wct-sim-ideal-sigproc.npz',
+local drifter = sim.drifter,
+local bagger = sim.make_bagger(),
+local sn_pipes = sim.splusn_pipelines,
 
 local chndb = [{
   type: 'OmniChannelNoiseDB',
   name: 'ocndbperfect%d' % n,
   data: perfect(params, tools.anodes[n], tools.field, n){dft:wc.tn(tools.dft)},
   uses: [tools.anodes[n], tools.field, tools.dft],
-} for n in anode_iota];
+} for n in anode_iota],
 
-local nf_pipes = [nf_maker(params, tools.anodes[n], chndb[n], n, name='nf%d' % n) for n in std.range(0, std.length(tools.anodes) - 1)];
+local nf_pipes = [nf_maker(params, tools.anodes[n], chndb[n], n, name='nf%d' % n) for n in std.range(0, std.length(tools.anodes) - 1)],
 
 local sp_override = {
     sparse: true,
@@ -56,20 +56,20 @@ local sp_override = {
     process_planes: [0, 1, 2],
     debug_no_frer: false,
     debug_no_wire_filter: false,
-};
+},
 
-local sp = sp_maker(params, tools, sp_override);
-local sp_pipes = [sp.make_sigproc(a) for a in tools.anodes];
+local sp = sp_maker(params, tools, sp_override),
+local sp_pipes = [sp.make_sigproc(a) for a in tools.anodes],
 
-// local magnify = import 'perfect_pdhd/magnify-sinks.jsonnet';
-local magnify = import 'magnify-sinks.jsonnet';
-local magnifyio = magnify(tools, magoutput);
+// local magnify = import 'perfect_pdhd/magnify-sinks.jsonnet',
+local magnify = import 'magnify-sinks.jsonnet',
+local magnifyio = magnify(tools, magoutput),
 
-local outtags = ['raw%d' % n for n in std.range(0, std.length(tools.anodes) - 1)];
+local outtags = ['raw%d' % n for n in std.range(0, std.length(tools.anodes) - 1)],
 
 
-local frame_input = fileio.frame_tensor_file_source('tensor_frames.npz');
-// local frame_input = fileio.frame_file_source('frames.tar', tags=outtags);
+local frame_input = fileio.frame_tensor_file_source(input_file),
+// local frame_input = fileio.frame_file_source('frames.tar', tags=outtags),
 
 local parallel_pipes = [
   g.pipeline([
@@ -80,7 +80,7 @@ local parallel_pipes = [
              ],
              'parallel_pipe_%d' % n)
   for n in std.range(0, std.length(tools.anodes) - 1)
-];
+],
 
 
 local simple_pipes = [
@@ -89,7 +89,7 @@ local simple_pipes = [
              ],
              'parallel_pipe_%d' % n)
   for n in std.range(0, std.length(tools.anodes) - 1)
-];
+],
 
 local fanout_apa_rules =
 [
@@ -110,13 +110,15 @@ local fanout_apa_rules =
         },
     }
     for n in std.range(0, std.length(tools.anodes) - 1)
-];
+],
 
-local parallel_graph = f.fanpipe('FrameFanout', parallel_pipes, 'FrameFanin', 'sn_mag_nf', outtags, fanout_apa_rules);
-local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fanout_apa_rules);
+local parallel_graph = f.fanpipe('FrameFanout', parallel_pipes, 'FrameFanin', 'sn_mag_nf', outtags, fanout_apa_rules),
+// local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fanout_apa_rules),
+local fanout_graph = g.fan.fanout('FrameFanout', simple_pipes, 'sn_mag_nf', fanout_apa_rules),
 
 
-local torch_maker = import 'torch2.jsonnet';
+
+local torch_maker = import 'torch2.jsonnet',
 local torch_nodes = torch_maker(
   tools,
   debug_force_cpu=false,
@@ -125,9 +127,9 @@ local torch_nodes = torch_maker(
   do_collate_apa=(std.extVar("CollateAPAs") == 1),
   do_run_roi=(std.extVar("RunROI") == 1),
   do_tiling=(std.extVar("DoTiling") == 1),
-);
-local spng_decons = torch_nodes.spng_decons;
-local spng_stacked = torch_nodes.stacked_spng;
+),
+local spng_decons = torch_nodes.spng_decons,
+local spng_stacked = torch_nodes.stacked_spng,
 
 local load_to_fanout = g.intern(
   innodes=[frame_input],
@@ -135,11 +137,11 @@ local load_to_fanout = g.intern(
   edges = [
     g.edge(frame_input, fanout_graph),
   ]
-);
+),
 
-local sink = sim.frame_sink;
+local sink = sim.frame_sink,
 
-local spng_flag = std.extVar("SPNG");
+local spng_flag = std.extVar("SPNG"),
 
 local graph = if (spng_flag == 0) then
     g.pipeline([frame_input, parallel_graph, sink])
@@ -167,14 +169,14 @@ local graph = if (spng_flag == 0) then
         g.edge(load_to_fanout, spng_stacked, 2, 2),
         g.edge(load_to_fanout, spng_stacked, 3, 3),
       ]
-    );
+    ),
 
 local app = {
   type: 'Pgrapher',
   data: {
     edges: g.edges(graph),
   },
-};
+},
 
 local cmdline = {
     type: "wire-cell",
@@ -184,8 +186,9 @@ local cmdline = {
           "WireCellSigProc", "WireCellRoot", "WireCellSpng"],
         apps: ["Pgrapher"]
     }
-};
+},
 
 
 // Finally, the configuration sequence which is emitted.
-[cmdline] + g.uses(graph) + [app]
+ret: [cmdline] + g.uses(graph) + [app]
+}.ret
