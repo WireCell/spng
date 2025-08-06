@@ -358,7 +358,7 @@ std::vector<torch::Tensor> fill_activity(const Coordinates& coords, const torch:
     // Shape (num_points, nviews)
     torch::Tensor all_pitch_indices = coords.point_indices(flattened_points);
 
-    std::cerr << "indices: " << all_pitch_indices << "\n";
+    // std::cerr << "indices: " << all_pitch_indices << "\n";
 
     // Use the torch::indexing namespace for Slice and Ellipsis
     using namespace torch::indexing;
@@ -367,7 +367,7 @@ std::vector<torch::Tensor> fill_activity(const Coordinates& coords, const torch:
 
     auto ab = coords.active_bounds();
 
-    std::cerr << "active bounds: " << ab << "\n";
+    // std::cerr << "active bounds: " << ab << "\n";
         
     // Iterate through each view to fill its individual activity tensor
     for (int64_t view_idx = 0; view_idx < nviews; ++view_idx) {
