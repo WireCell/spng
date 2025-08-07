@@ -259,15 +259,15 @@ void SPNG::TorchFRERSpectrum::redigitize(
     auto result_accessor = the_tensor.accessor<double,2>();
     auto total_response_accessor = m_total_response.accessor<double,2>();
     for (int irow = 0; irow < m_fravg_nchans; ++irow) {
-        std::cout << "Redigitizing " << irow << std::endl;
+        // std::cout << "Redigitizing " << irow << std::endl;
         int fcount = 1;
         for (int i = 0; i < nticks; i++) {
             double ctime = m_default_period*i;
-            if (irow == 0) 
-                    std::cout << i << " Ctime: " << ctime << std::endl;
+            // if (irow == 0) 
+            //         std::cout << i << " Ctime: " << ctime << std::endl;
             if (fcount < m_fravg_nticks) {
                 while (ctime > fcount*m_fravg_period) {
-                    if (irow == 0) std::cout << "\tftime: " << fcount*m_fravg_period << std::endl;
+                    // if (irow == 0) std::cout << "\tftime: " << fcount*m_fravg_period << std::endl;
                     fcount++;
                     if (fcount >= m_fravg_nticks) break;
                 }
@@ -278,12 +278,12 @@ void SPNG::TorchFRERSpectrum::redigitize(
                     (ctime - m_fravg_period*(fcount - 1)) / m_fravg_period * total_response_accessor[irow][fcount - 1] +
                     (m_fravg_period*fcount - ctime) / m_fravg_period * total_response_accessor[irow][fcount]
                 );
-                if (irow == 0) {
-                    std::cout << "\t" << ctime << " " << fcount << " " << std::setprecision(10) << m_fravg_period*(fcount - 1) << " " << std::setprecision(10) << m_fravg_period*fcount << std::endl;
-                    std::cout << "\tdiff: " << (ctime - m_fravg_period*(fcount - 1)) << " " << (m_fravg_period*fcount - ctime) << std::endl;
-                    std::cout << "\t" << m_fravg_period << " " << total_response_accessor[irow][fcount - 1] << " " << total_response_accessor[irow][fcount] << std::endl;
-                    std::cout << "\t" << result_accessor[irow][i] << std::endl;
-                }
+                // if (irow == 0) {
+                //     std::cout << "\t" << ctime << " " << fcount << " " << std::setprecision(10) << m_fravg_period*(fcount - 1) << " " << std::setprecision(10) << m_fravg_period*fcount << std::endl;
+                //     std::cout << "\tdiff: " << (ctime - m_fravg_period*(fcount - 1)) << " " << (m_fravg_period*fcount - ctime) << std::endl;
+                //     std::cout << "\t" << m_fravg_period << " " << total_response_accessor[irow][fcount - 1] << " " << total_response_accessor[irow][fcount] << std::endl;
+                //     std::cout << "\t" << result_accessor[irow][i] << std::endl;
+                // }
             }
 
         }

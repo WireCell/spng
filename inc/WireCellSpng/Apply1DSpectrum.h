@@ -30,6 +30,7 @@ namespace SPNG {
         Json::Value m_target_tensor{"Default"},
                     m_output_set_tag,
                     m_output_tensor_tag{"Default"};
+        Json::Value m_passthrough{Json::arrayValue};
     };
 }
 }

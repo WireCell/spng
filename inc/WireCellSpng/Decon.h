@@ -37,6 +37,7 @@ namespace SPNG {
         bool m_pad_wire_domain = false;
         
         Json::Value m_output_set_tag{"Decon2D"}, m_output_tensor_tag{"Default"};
+        Json::Value m_passthrough{Json::arrayValue};
     };
 }
 }

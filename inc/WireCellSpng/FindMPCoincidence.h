@@ -36,9 +36,11 @@ namespace SPNG {
                m_angle_in_radians{0.6230825}; //35.7deg
         
         torch::Tensor m_trivial_blobs;
-        std::vector<torch::Tensor> m_raygrid_views;
+        torch::Tensor m_raygrid_views;
         std::string m_anode_tn{"AnodePlane"};
         IAnodePlane::pointer m_anode;
+        int m_face_index{0};
+        std::vector<std::unordered_map<int, std::vector<int>>> m_chan_id_to_wires{3};
 
         
     };

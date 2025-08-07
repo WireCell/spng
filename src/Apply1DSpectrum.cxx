@@ -4,6 +4,7 @@
 #include "WireCellSpng/SimpleTorchTensor.h"
 #include "WireCellSpng/SimpleTorchTensorSet.h"
 #include "WireCellSpng/ITorchSpectrum.h"
+#include "WireCellSpng/Util.h"
 
 WIRECELL_FACTORY(SPNGApply1DSpectrum, WireCell::SPNG::Apply1DSpectrum,
                  WireCell::INamed,
@@ -18,6 +19,8 @@ WireCell::SPNG::Apply1DSpectrum::~Apply1DSpectrum() {};
 
 
 void WireCell::SPNG::Apply1DSpectrum::configure(const WireCell::Configuration& config) {
+
+    m_passthrough.append("channel_map");
 
     m_base_spectrum_name = get(config, "base_spectrum_name", m_base_spectrum_name);
     log->debug("Loading Spectrum {}", m_base_spectrum_name);
@@ -60,11 +63,13 @@ bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output
     //Get the cloned tensor from the input
     bool found = false;
     auto tensor_clone = torch::empty(0);
+    Configuration input_md;
     for (auto torch_tensor : *(in->tensors())) {
-        auto md = torch_tensor->metadata();
-        if (md.isMember("tag") && (md["tag"] == m_target_tensor)) {
+        input_md = torch_tensor->metadata();
+        if (input_md.isMember("tag") && (input_md["tag"] == m_target_tensor)) {
             tensor_clone = torch_tensor->tensor().clone();
             found = true;
+            break;
         }
     }
     if (!found) {
@@ -115,7 +120,8 @@ bool WireCell::SPNG::Apply1DSpectrum::operator()(const input_pointer& in, output
     Configuration set_md, tensor_md;
     set_md["tag"] = m_output_set_tag;
     tensor_md["tag"] = m_output_tensor_tag;
-
+    metadata_passthrough(input_md, tensor_md, m_passthrough);
+    // log->debug("Passed channel_map\n{}", tensor_md["channel_map"]);
     std::vector<ITorchTensor::pointer> itv{
         std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md)
     };

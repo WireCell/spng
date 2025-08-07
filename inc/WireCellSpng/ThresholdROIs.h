@@ -28,6 +28,7 @@ namespace SPNG {
         bool m_unsqueeze_input{false};
         double m_threshold_rms_factor{1.};
         Json::Value m_output_set_tag{"ThresholdROIs"}, m_output_tensor_tag{"Default"};
+        Json::Value m_passthrough{Json::arrayValue};
     };
 }
 }

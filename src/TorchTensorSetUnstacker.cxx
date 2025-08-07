@@ -65,14 +65,19 @@ bool SPNG::TorchTensorSetUnstacker::operator()(const input_pointer& in, output_v
     // THROW
     // }
 
-    
     Configuration tensor_md, set_md;
+    
+    // std::cout << tensor_md["channel_map"] << std::endl;
 
-    for (size_t output_index = 0; output_index < outv.size(); ++output_index) {
+    for (int output_index = 0; output_index < outv.size(); ++output_index) {
         //Clone the tensor to take ownership of the memory and put into 
         //output 
+        tensor_md["channel_map"] = in->tensors()->at(0)->metadata()["channel_map"][output_index];
         std::vector<ITorchTensor::pointer> itv{
-            std::make_shared<SimpleTorchTensor>(output_tensors[output_index]) //.clone())
+            std::make_shared<SimpleTorchTensor>(
+                output_tensors[output_index],
+                tensor_md
+            ) //.clone())
         };
         outv[output_index] = std::make_shared<SimpleTorchTensorSet>(
             in->ident(), set_md,

@@ -3,6 +3,8 @@
 #include "WireCellUtil/Exceptions.h"
 #include "WireCellSpng/SimpleTorchTensor.h"
 #include "WireCellSpng/SimpleTorchTensorSet.h"
+#include "WireCellSpng/Util.h"
+
 // #include "WireCellSpng/ITorchFieldResponse.h"
 
 // #include "WireCellSpng/ITorchColdElecResponse.h"
@@ -21,6 +23,7 @@ WireCell::SPNG::ThresholdROIs::~ThresholdROIs() {};
 
 void WireCell::SPNG::ThresholdROIs::configure(const WireCell::Configuration& config) {
 
+    m_passthrough.append("channel_map");
 
     m_output_set_tag = get(config, "output_set_tag", m_output_set_tag);
     m_output_tensor_tag = get(config, "output_tensor_tag", m_output_tensor_tag);
@@ -101,7 +104,8 @@ bool WireCell::SPNG::ThresholdROIs::operator()(const input_pointer& in, output_p
 
 
     Configuration set_md, tensor_md;
-
+    metadata_passthrough(in->tensors()->at(0)->metadata(), tensor_md, m_passthrough);
+    // log->debug("Passed channel_map\n{}", tensor_md["channel_map"]);
     tensor_md["tag"] = m_output_tensor_tag;
     set_md["tag"] = m_output_set_tag;
     auto output_tensor = std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md);

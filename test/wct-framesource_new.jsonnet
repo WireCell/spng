@@ -1,4 +1,7 @@
-function(input_file='tensor_frames.npz', skip_noise='False') {# usage: wire-cell -l stdout wct-sim-check.jsonnet
+function(
+  input_file='tensor_frames.npz',
+  skip_noise='False',
+) {# usage: wire-cell -l stdout wct-sim-check.jsonnet
 
 local g = import 'pgraph.jsonnet',
 local f = import 'pgrapher/common/funcs.jsonnet',

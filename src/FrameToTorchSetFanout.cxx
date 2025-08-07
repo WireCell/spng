@@ -47,14 +47,16 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
             for (auto wpid : group) {
                 WirePlaneId the_wpid(wpid.asInt());
                 m_output_groups[the_wpid] = i;
+                m_per_group_channel_map.emplace_back();
+
                 log->debug("WPID: {}", WirePlaneId(wpid.asInt()));
             }
             ++i;
         }
     }
-    
 
-    //Make a map to go from the channel ID to the output group    
+
+    //Make a map to go from the channel ID to the output group
     //First Loop over the faces in the anode we're working with
     for (const auto & face : m_anode->faces()) {
         if (!face) {   // A null face means one sided AnodePlane.
@@ -75,14 +77,15 @@ void SPNG::FrameToTorchSetFanout::configure(const WireCell::Configuration& confi
                 //Within a given plane, the traces will be in order as they were
                 //seen here. We have a map to determine what the output
                 //size (nchannels) is when we make the tensors later.
-                //When first accessed with [] it will put in zero.
-                //Using obj++ returns the original obj value before incrementing.
-                m_channel_map[channel->ident()] = m_output_nchannels[out_group]++;
+                //We also save the reverse order map per each group for metadata
+                auto output_channel = m_output_nchannels[out_group];
+                m_channel_map[channel->ident()] = output_channel;
+                m_per_group_channel_map[out_group][std::to_string(output_channel)] = channel->ident();
+                ++m_output_nchannels[out_group];
                 // std::cout << "[hyu1]chmap: " << channel->ident() << " " << plane->ident() << " " << m_channel_map[channel->ident()] << std::endl;
             }
         }
     }
-
 }
 
 std::vector<std::string> SPNG::FrameToTorchSetFanout::output_types()
@@ -175,9 +178,11 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
     for (const auto & [output_index, nchannels] : m_output_nchannels) {
         
         // TODO: set md
-        Configuration set_md;
+        Configuration set_md, tensor_md;
         set_md["period"] = in->tick();
 
+        tensor_md["channel_map"] = m_per_group_channel_map[output_index];
+        // std::cout << output_index << "Saved channel map:\n" << tensor_md["channel_map"] << std::endl;
         if (m_unsqueeze_output) {
             tensors[output_index] = torch::unsqueeze(tensors[output_index], 0);
         }
@@ -185,7 +190,7 @@ bool SPNG::FrameToTorchSetFanout::operator()(const input_pointer& in, output_vec
         //Clone the tensor to take ownership of the memory and put into 
         //output 
         std::vector<ITorchTensor::pointer> itv{
-            std::make_shared<SimpleTorchTensor>(tensors[output_index].to(device)) //.clone())
+            std::make_shared<SimpleTorchTensor>(tensors[output_index].to(device), tensor_md)
         };
         outv[output_index] = std::make_shared<SimpleTorchTensorSet>(
             in->ident(), set_md,

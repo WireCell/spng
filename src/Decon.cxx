@@ -6,6 +6,7 @@
 // #include "WireCellSpng/ITorchFieldResponse.h"
 #include "WireCellSpng/ITorchSpectrum.h"
 #include "WireCellUtil/FFTBestLength.h"
+#include "WireCellSpng/Util.h"
 
 // #include "WireCellSpng/ITorchColdElecResponse.h"
 
@@ -22,6 +23,8 @@ WireCell::SPNG::Decon::~Decon() {};
 
 
 void WireCell::SPNG::Decon::configure(const WireCell::Configuration& config) {
+
+    m_passthrough.append("channel_map");
 
     m_frer_spectrum = get(config, "frer_spectrum", m_frer_spectrum);
     base_frer_spectrum = Factory::find_tn<ITorchSpectrum>(m_frer_spectrum);
@@ -177,6 +180,8 @@ bool WireCell::SPNG::Decon::operator()(const input_pointer& in, output_pointer& 
     Configuration set_md, tensor_md;
 
     tensor_md["tag"] = m_output_tensor_tag;
+    metadata_passthrough(in->tensors()->at(0)->metadata(), tensor_md, m_passthrough);
+    // log->debug("Passed channel_map\n{}", tensor_md["channel_map"]);
     set_md["tag"] = m_output_set_tag;
     auto output_tensor = std::make_shared<SimpleTorchTensor>(tensor_clone, tensor_md);
     std::vector<ITorchTensor::pointer> itv{

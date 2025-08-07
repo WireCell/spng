@@ -73,10 +73,17 @@ bool SPNG::TorchTensorSetCollator::operator()(const input_vector& inv, output_po
     for (auto in : inv) {
         auto this_set_tag = in->metadata()["tag"];
         for (auto tensor : (*in->tensors())) {
-            auto this_tensor_tag = tensor->metadata()["tag"];
+            auto input_metadata = tensor->metadata();
+            auto this_tensor_tag = input_metadata["tag"];
             std::string combined_tag = this_set_tag.asString() + ":" + this_tensor_tag.asString();
             log->debug("Adding tensor with tag {}", combined_tag);
+            
             Configuration tensor_md;
+            if (input_metadata.isMember("channel_map")) {
+                tensor_md["channel_map"] = input_metadata["channel_map"];
+                std::cout << "Storing channel map" << std::endl;
+            }
+
             tensor_md["tag"] = combined_tag;
             itv.push_back(
                 std::make_shared<SimpleTorchTensor>(tensor->tensor(), tensor_md)

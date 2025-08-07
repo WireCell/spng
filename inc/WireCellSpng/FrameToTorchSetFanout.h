@@ -40,6 +40,8 @@ namespace WireCell {
             //Channel Map
             std::unordered_map<int, int> m_channel_map;
             std::unordered_map<int, int> m_channel_to_output_group;
+            std::vector<Json::Value> m_per_group_channel_map;
+
 
             //Expand dimensionality on output
             bool m_unsqueeze_output{false};

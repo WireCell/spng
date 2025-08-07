@@ -71,6 +71,10 @@ bool SPNG::TorchTensorSetStacker::operator()(const input_vector& inv, output_poi
 
     std::vector<torch::Tensor> inputs;
 
+    Json::Value stacked_metadata;
+    stacked_metadata["channel_map"] = Json::Value(Json::arrayValue);
+
+
     // std::vector<ITorchTensor::pointer> itv;
     for (auto in : inv) {
         auto this_set_tag = in->metadata()["tag"];
@@ -78,6 +82,8 @@ bool SPNG::TorchTensorSetStacker::operator()(const input_vector& inv, output_poi
 
             inputs.push_back(tensor->tensor());
 
+            stacked_metadata["channel_map"].append(tensor->metadata()["channel_map"]);
+            // std::cout << tensor->metadata()["channel_map"] << std::endl;
             // auto this_tensor_tag = tensor->metadata()["tag"];
             // std::string combined_tag = this_set_tag.asString() + ":" + this_tensor_tag.asString();
             // log->debug("Adding tensor with tag {}", combined_tag);
@@ -89,6 +95,8 @@ bool SPNG::TorchTensorSetStacker::operator()(const input_vector& inv, output_poi
         }
     }
     Configuration tensor_md;
+    tensor_md["channel_map"] = stacked_metadata["channel_map"];
+    // std::cout << "Added stacked channel map\n" << tensor_md["channel_map"] << std::endl;
     auto output_tensor = std::make_shared<SimpleTorchTensor>(torch::cat(inputs), tensor_md);
     std::vector<ITorchTensor::pointer> itv{
         output_tensor
