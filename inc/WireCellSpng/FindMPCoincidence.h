@@ -41,6 +41,9 @@ namespace SPNG {
         IAnodePlane::pointer m_anode;
         int m_face_index{0};
         std::vector<std::unordered_map<int, std::vector<int>>> m_chan_id_to_wires{3};
+        std::map<int, int> m_plane_nwires;
+        std::map<int, torch::Tensor> m_plane_wires_to_channels;
+        std::string m_output_torch_name;
 
         
     };

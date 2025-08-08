@@ -1,5 +1,5 @@
 # usage: wire-cell -l stdout wct-sim-check.jsonnet
-function(outname="tensor_frames.npz", skip_noise="False") {
+function(outname="tensor_frames.npz", skip_noise="False", do_depo="False") {
   local g = import 'pgraph.jsonnet',
   local f = import 'pgrapher/common/funcs.jsonnet',
   local wc = import 'wirecell.jsonnet',
@@ -45,12 +45,17 @@ function(outname="tensor_frames.npz", skip_noise="False") {
     head: wc.point(beam_center1[0], beam_center1[1], beam_center1[2], wc.cm),
     tail: wc.point(beam_center1[0] + 100*beam_dir[0], beam_center1[1] + 100*beam_dir[1], beam_center1[2] + 100*beam_dir[2], wc.cm),
   },
+
+  local depo_track = {
+    head: wc.point(beam_center[0], beam_center[1], 50.0, wc.cm),
+    tail: wc.point(beam_center[0], beam_center[1], 50.1, wc.cm),
+  },
   local tracklist = [
 
     {
       time: 0 * wc.us,
       charge: -500, // negative means # electrons per step (see below configuration) 
-      ray: track0, // params.det.bounds,
+      ray: (if do_depo=="False" then track0 else depo_track), // params.det.bounds,
     },
 
     // {
@@ -61,6 +66,7 @@ function(outname="tensor_frames.npz", skip_noise="False") {
   ],
 
   local depos = sim.tracks(tracklist, step=0.1 * wc.mm), // MIP <=> 5000e/mm
+
 
   local nanodes = std.length(tools.anodes),
   local anode_iota = std.range(0, nanodes-1),

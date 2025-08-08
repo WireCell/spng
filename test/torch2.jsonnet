@@ -710,6 +710,7 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                         target_plane_index: 0,
                         aux_plane_l_index: 2,
                         aux_plane_m_index: 1,
+                        output_torch_name: "tiling_%d_tensors.pt" % anode.data.ident,
                     },
                 }, nin=1, nout=1, uses=[anode]) for anode in tools.anodes
             ],
@@ -728,25 +729,31 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                     spng_gaus_apps + apply_loose_rois + threshold_rois,
             
             local edges = [
-                g.edge(fans_to_stacks, torch_to_tensors[0], 0),
-                g.edge(fans_to_stacks, torch_to_tensors[1], 1),
-                g.edge(fans_to_stacks, torch_to_tensors[2], 2),
+                // g.edge(fans_to_stacks, torch_to_tensors[0], 0),
+                // g.edge(fans_to_stacks, torch_to_tensors[1], 1),
+                // g.edge(fans_to_stacks, torch_to_tensors[2], 2),
 
-                // g.edge(fans_to_stacks, spng_decons[0], 0),
-                // g.edge(fans_to_stacks, spng_decons[1], 1),
-                // g.edge(fans_to_stacks, spng_decons[2], 2),
+                g.edge(fans_to_stacks, spng_decons[0], 0),
+                g.edge(fans_to_stacks, spng_decons[1], 1),
+                g.edge(fans_to_stacks, spng_decons[2], 2),
 
-                // g.edge(spng_decons[0], apply_loose_rois[0]),
-                // g.edge(spng_decons[1], apply_loose_rois[1]),
-                // g.edge(spng_decons[2], apply_loose_rois[2]),
+                g.edge(spng_decons[0], apply_loose_rois[0]),
+                g.edge(spng_decons[1], apply_loose_rois[1]),
+                g.edge(spng_decons[2], apply_loose_rois[2]),
+            ] + 
+            (if do_run_roi then [
+                g.edge(apply_loose_rois[0], threshold_rois[0]),
+                g.edge(apply_loose_rois[1], threshold_rois[1]),
+                g.edge(apply_loose_rois[2], threshold_rois[2]),
 
-                // g.edge(apply_loose_rois[0], threshold_rois[0]),
-                // g.edge(apply_loose_rois[1], threshold_rois[1]),
-                // g.edge(apply_loose_rois[2], threshold_rois[2]),
-
-                // g.edge(threshold_rois[0], torch_to_tensors[0]),
-                // g.edge(threshold_rois[1], torch_to_tensors[1]),
-                // g.edge(threshold_rois[2], torch_to_tensors[2]),
+                g.edge(threshold_rois[0], torch_to_tensors[0]),
+                g.edge(threshold_rois[1], torch_to_tensors[1]),
+                g.edge(threshold_rois[2], torch_to_tensors[2]),
+            ] else [
+                g.edge(apply_loose_rois[0], torch_to_tensors[0]),
+                g.edge(apply_loose_rois[1], torch_to_tensors[1]),
+                g.edge(apply_loose_rois[2], torch_to_tensors[2]),
+            ]) + [
 
                 g.edge(torch_to_tensors[0], tensor_sinks[0]),
                 g.edge(torch_to_tensors[1], tensor_sinks[1]),
