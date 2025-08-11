@@ -683,7 +683,7 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
                 name: 'spng_threshold_rois_plane%d' % iplane,
                 data: {
                     unsqueeze_input: false,
-                    threshold_rms_factor: 3.0,
+                    threshold_rms_factor: 4.5,
                     debug_force_cpu: debug_force_cpu,
                 }
             },

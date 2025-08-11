@@ -142,6 +142,23 @@ local load_to_fanout = g.intern(
   ]
 ),
 
+// local fanout = g.pnode({
+//     type: "FrameFanout",
+//     name: "sn_mag_nf",
+//     data: {
+//         multiplicity: 4,
+//         tag_rules: fanout_apa_rules,
+//     },
+// }, nin=1, nout=4),
+
+// local load_to_fanout = g.intern(
+//   innodes=[frame_input],
+//   outnodes=[fanout],
+//   edges = [
+//     g.edge(frame_input, fanout),
+//   ]
+// ),
+
 local sink = sim.frame_sink,
 
 local spng_flag = std.extVar("SPNG"),

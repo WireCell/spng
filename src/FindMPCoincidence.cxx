@@ -310,7 +310,7 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
         auto target_row = target_rows.index({Slice(), irow});
 
         // auto raygrid_row_l = element_tensor_l.to(m_device);
-        auto blobs = WireCell::Spng::RayGrid::apply_activity(m_raygrid_coords, m_trivial_blobs, l_row/*raygrid_row_l*/);
+        auto blobs = WireCell::Spng::RayGrid::apply_activity(m_raygrid_coords, m_trivial_blobs, l_row);
 
         // std::cout << "First layer done" << std::endl;
         // std::cout << blobs.sizes() << std::endl;
@@ -318,17 +318,17 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
             // std::cout << "Found no blobs. Moving on" << std::endl;
             continue;
         }
-        for (int iblob = 0; iblob < blobs.size(0); ++iblob) {
-            // std::cout << mp3_accessor[iblob][4][0] << " " << mp3_accessor[iblob][4][1] << std::endl;
-            output_l_blobs.index_put_(
-                {
-                    0,
-                    torch::indexing::Slice(blobs.index({iblob, -1, 0}).item<long>(), blobs.index({iblob, -1, 1}).item<long>()),
-                    torch::indexing::Slice(irow, (irow+1))
-                },
-                1.
-            );
-        }
+        // for (int iblob = 0; iblob < blobs.size(0); ++iblob) {
+        //     // std::cout << mp3_accessor[iblob][4][0] << " " << mp3_accessor[iblob][4][1] << std::endl;
+        //     output_l_blobs.index_put_(
+        //         {
+        //             0,
+        //             torch::indexing::Slice(blobs.index({iblob, -1, 0}).item<long>(), blobs.index({iblob, -1, 1}).item<long>()),
+        //             torch::indexing::Slice(irow, (irow+1))
+        //         },
+        //         1.
+        //     );
+        // }
         // auto raygrid_row_m = element_tensor_m.to(m_device);
         blobs = WireCell::Spng::RayGrid::apply_activity(m_raygrid_coords, blobs, m_row/*raygrid_row_m*/);
         // {//Writing blobs with l & m
@@ -344,26 +344,22 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
             continue;
         }
 
-        for (int iblob = 0; iblob < blobs.size(0); ++iblob) {
-            // std::cout << mp3_accessor[iblob][4][0] << " " << mp3_accessor[iblob][4][1] << std::endl;
-            output_m_blobs.index_put_(
-                {
-                    0,
-                    torch::indexing::Slice(blobs.index({iblob, -1, 0}).item<long>(), blobs.index({iblob, -1, 1}).item<long>()),
-                    torch::indexing::Slice(irow, (irow+1))
-                },
-                1.
-            );
-        }
+        // for (int iblob = 0; iblob < blobs.size(0); ++iblob) {
+        //     // std::cout << mp3_accessor[iblob][4][0] << " " << mp3_accessor[iblob][4][1] << std::endl;
+        //     output_m_blobs.index_put_(
+        //         {
+        //             0,
+        //             torch::indexing::Slice(blobs.index({iblob, -1, 0}).item<long>(), blobs.index({iblob, -1, 1}).item<long>()),
+        //             torch::indexing::Slice(irow, (irow+1))
+        //         },
+        //         1.
+        //     );
+        // }
 
-        // continue;
         //For the last layer, get the bounds of the would-be created blobs
         //MP3 means our target plane has activity overlapping with blobs from the first 2 layers
         tester = tester.to(m_device);
-        // auto raygrid_row_n = element_tensor_n.to(m_device);
         auto target_active = (target_row/*raygrid_row_n*/ > tester);
-        // std::cout << target_active << std::endl;
-        // auto one = torch::ones({1}).to(m_device);
         if (target_active.any().item<bool>()) {
             auto mp3_blobs = WireCell::Spng::RayGrid::apply_activity(
                 m_raygrid_coords, blobs, target_active
@@ -377,52 +373,35 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
             //     output_file.close();
             // }
 
-            // auto mp3_accessor = mp3_blobs.accessor<long, 3>();
-            // std::cout << "MP3 Blobs: " << mp3_blobs.sizes() << std::endl;
-            for (int iblob = 0; iblob < mp3_blobs.size(0); ++iblob) {
-                // std::cout << mp3_accessor[iblob][4][0] << " " << mp3_accessor[iblob][4][1] << std::endl;
-                output_tensor_active.index_put_(
-                    {
-                        0,
-                        torch::indexing::Slice(mp3_blobs.index({iblob, -1, 0}).item<long>(), mp3_blobs.index({iblob, -1, 1}).item<long>()),
-                        torch::indexing::Slice(irow, (irow+1))
-                    },
-                    1.
-                );
+            if (mp3_blobs.size(0) > 0) {
+                std::vector<torch::Tensor> indices;
+                for (int iblob = 0; iblob < mp3_blobs.size(0); ++iblob) {
+                    indices.push_back(
+                        torch::arange(mp3_blobs.index({iblob, -1, 0}).item<long>(), mp3_blobs.index({iblob, -1, 1}).item<long>())
+                    );
+                }
+                auto indices_tensor = std::get<0>(at::_unique(torch::cat(indices)));
+                output_tensor_active.index_put_({0, indices_tensor, irow}, 1.);
             }
-            // std::cout << 4*irow << " " << 4*(irow+1) << std::endl;
-            // std::cout << lo_mp3 << std::endl;
-            // std::cout << hi_mp3 << std::endl;
         }
         
         //MP2 means our target plane does not have activity overlapping with blobs from the first 2 layers
-        auto target_inactive = (target_row/*raygrid_row_n*/ == tester);
-        // std::cout << target_inactive << std::endl;
+        auto target_inactive = (target_row == tester);
         if (target_inactive.any().item<bool>()) {
             auto mp2_blobs = WireCell::Spng::RayGrid::apply_activity(
                 m_raygrid_coords, blobs, target_inactive
             );
             
-            // auto mp2_accessor = mp2_blobs.accessor<long, 3>();
-            // std::cout << "MP2 Blobs: " << mp2_blobs.sizes() << std::endl;
-            // std::cout << mp2_blobs << std::endl;
-            for (int iblob = 0; iblob < mp2_blobs.size(0); ++iblob) {
-                // std::cout << iblob << std::endl;
-                // std::cout << mp2_accessor[iblob][4][0] << " " << mp2_accessor[iblob][4][1] << std::endl;
-                output_tensor_inactive.index_put_(
-                    {
-                        0,
-                        torch::indexing::Slice(
-                            mp2_blobs.index({iblob, -1, 0}).item<long>(),
-                            mp2_blobs.index({iblob, -1, 1}).item<long>()),
-                        torch::indexing::Slice(irow, (irow+1))
-                    },
-                    1.
-                );
+            if (mp2_blobs.size(0) > 0) {
+                std::vector<torch::Tensor> indices;
+                for (int iblob = 0; iblob < mp2_blobs.size(0); ++iblob) {
+                    indices.push_back(
+                        torch::arange(mp2_blobs.index({iblob, -1, 0}).item<long>(), mp2_blobs.index({iblob, -1, 1}).item<long>())
+                    );
+                }
+                auto indices_tensor = std::get<0>(at::_unique(torch::cat(indices)));
+                output_tensor_inactive.index_put_({0, indices_tensor, irow}, 1.);
             }
-            // // std::cout << 4*irow << " " << 4*(irow+1) << std::endl;
-            // // std::cout << lo_mp2 << std::endl;
-            // // std::cout << hi_mp2 << std::endl;
         }
     }
 
@@ -446,55 +425,55 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
         std::make_shared<std::vector<ITorchTensor::pointer>>(itv)
     );
 
-    {//Writing l_rows
-        auto name = "rows_l_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(l_rows.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
-    {//Writing m_rows
-        auto name = "rows_m_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(m_rows.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
-    {//Writing target_rows
-        auto name = "rows_target_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(target_rows.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
+    // {//Writing l_rows
+    //     auto name = "rows_l_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(l_rows.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
+    // {//Writing m_rows
+    //     auto name = "rows_m_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(m_rows.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
+    // {//Writing target_rows
+    //     auto name = "rows_target_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(target_rows.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
 
-    {//Writing views
-        auto name = "views_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(m_raygrid_views.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
-    {//Writing blobs with l
-        auto name = "blobs_l_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(output_l_blobs.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
-    {//Writing blobs with m
-        auto name = "blobs_m_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(output_m_blobs.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
+    // {//Writing views
+    //     auto name = "views_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(m_raygrid_views.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
+    // {//Writing blobs with l
+    //     auto name = "blobs_l_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(output_l_blobs.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
+    // {//Writing blobs with m
+    //     auto name = "blobs_m_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(output_m_blobs.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
 
     // std::ofstream output_file(m_output_torch_name, std::ios::out | std::ios::binary);
     // to_save.insert("coords", m_raygrid_views.to(torch::kCPU));
