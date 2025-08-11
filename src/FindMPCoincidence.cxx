@@ -98,8 +98,7 @@ void WireCell::SPNG::FindMPCoincidence::configure(const WireCell::Configuration&
     }
     // }
 
-
-    //Build up map from wires to channels for fast lookup
+    //Build up map to/from wires to channels for fast lookup
     for (const auto & plane : face->planes()) {
         if (face->ident() == m_face_index) {//Only do this once
             std::cout << "Plane wires: " << plane->wires().size() << std::endl;
@@ -107,8 +106,9 @@ void WireCell::SPNG::FindMPCoincidence::configure(const WireCell::Configuration&
             m_plane_wires_to_channels[plane->ident()] = torch::zeros({plane->wires().size()}, torch::TensorOptions().dtype(torch::kInt32));
         }
     }
-            
+
     std::vector<int> plane_to_nchans(3);
+    std::vector<int> max_nwires(3, 0);
     for (const auto & iface : m_anode->faces()) {
         //Hardcoding this until I figure out a better solution
         //Reset the collection plane
@@ -122,7 +122,7 @@ void WireCell::SPNG::FindMPCoincidence::configure(const WireCell::Configuration&
             // }
             auto wires_to_chans_accessor = m_plane_wires_to_channels[plane->ident()].accessor<int, 1>();
 
-            auto & map = m_chan_id_to_wires[plane->ident()];
+            auto & map = m_chan_index_to_wires[plane->ident()];
             // int ichan = 0;
             for (const auto & plane_chan : plane->channels()) {
                 int & ichan = plane_to_nchans[plane->ident()];
@@ -130,7 +130,9 @@ void WireCell::SPNG::FindMPCoincidence::configure(const WireCell::Configuration&
                 for (const auto & w : plane_chan->wires()) {
                     std::cout << "\t" << w->index() << " " <<  w->planeid().face() << std::endl;
                     if (w->planeid().face() == face->ident()) { //Have to check against the target face
-                        map[plane_chan->ident()].push_back(w->index());
+                        auto & temp_chans_to_wires = map[ichan];
+                        temp_chans_to_wires.push_back(w->index());
+                        if (temp_chans_to_wires.size() > max_nwires[plane->ident()]) max_nwires[plane->ident()] = temp_chans_to_wires.size();
                         wires_to_chans_accessor[w->index()] = ichan;
                     }
                 }
@@ -138,32 +140,55 @@ void WireCell::SPNG::FindMPCoincidence::configure(const WireCell::Configuration&
             }
         }
     }
+
+    for (size_t iplane = 0; iplane < plane_to_nchans.size(); ++iplane) {
+        auto nchans = plane_to_nchans[iplane];
+        auto & chan_to_wires_tensor = m_plane_channels_to_wires[iplane];
+        chan_to_wires_tensor = torch::full(
+            {nchans, max_nwires[iplane]},
+            m_plane_nwires[iplane], //for default channel
+            torch::TensorOptions().dtype(torch::kInt64));
+            
+        
+        for (auto & [chan, wires] : m_chan_index_to_wires[iplane]) {
+            for (size_t iw = 0; iw < wires.size(); iw++) {
+                chan_to_wires_tensor[chan][iw] = wires[iw];
+            }
+        }
+
+        std::cout << "Mapped channels to wires\n" << chan_to_wires_tensor << std::endl;
+    }
+
     
     for (const auto & plane : face->planes()) {
         std::cout << "Wires to chans\n" << m_plane_wires_to_channels[plane->ident()] << std::endl;
     }
 
-    // //For testing/building up do one face at first
-    // const auto & face = m_anode->faces()[0];
-    // std::cout << "Face: " << face << std::endl;
-    // const auto & raygrid = face->raygrid();
-    // std::cout << "Got Raygrid" << std::endl;
-    // const auto & pitch_mags = face->raygrid().pitch_mags();
-    // std::cout << pitch_mags << std::endl;
-    // const auto & pitch_dirs = face->raygrid().pitch_dirs();
-    
-    // const auto & centers = face->raygrid().centers();
-    // auto next_rays = centers;
-    // std::cout << "Checking" << std::endl;
-    // for (int ilayer = 0; ilayer < face->raygrid().nlayers(); ++ilayer) {
-    //     std::cout << "ilayer: " << ilayer << std::endl;
-    //     next_rays[ilayer] += pitch_dirs[ilayer]*pitch_mags[ilayer];
-    // }
+}
 
-    // // torch::Tensor pitches = torch::zeros({5, 2, 2}/*, options*/);
-    // // pitches.index_put_({0}, torch::Tensor(
-    // //     {{face->raygrid().centers[0]}}
-    // // ));
+void WireCell::SPNG::FindMPCoincidence::convert_wires_to_channels(
+        torch::Tensor & input, torch::Tensor & indices) {
+    input = torch::cat(
+        torch::TensorList({
+            input.squeeze(0),
+             torch::zeros({1, input.size(-1)}, torch::TensorOptions(m_device))}),
+        0//Wire dimension
+    ).permute({1, 0})//Put wire dimension last
+    .unsqueeze(1)//Add a dimension so we can broadcast within gather
+    .expand({-1, indices.size(0), -1});//And repeat it according to the number of channels
+    
+    input = torch::gather(
+        input,
+        2,//New wire dimension
+        indices.unsqueeze(0).expand({input.size(0), -1, -1})
+    );
+
+    input = torch::any(//Check if any wire segments according to this channel are active
+        input,
+        2
+    ).permute({1, 0})//Put channels first again 
+    .unsqueeze(0)//and add another 'batch' dimension
+    .to(torch::kFloat64);//And make it double
 }
 
 bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, output_pointer& out) {
@@ -174,13 +199,12 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
     }
     log->debug("Running FindMPCoincidence");
 
-    torch::Device device((
+    m_device = ((
         (torch::cuda::is_available() && !m_debug_force_cpu) ? torch::kCUDA : torch::kCPU
     ));
-    m_trivial_blobs = m_trivial_blobs.to(device);
+    m_trivial_blobs = m_trivial_blobs.to(m_device);
 
-    m_raygrid_views = m_raygrid_views.to(device);
-    // m_raygrid_views = m_raygrid_views.to(device);
+    m_raygrid_views = m_raygrid_views.to(m_device);
 
     // std::cout << m_raygrid_views[0] << std::endl;
 
@@ -188,25 +212,12 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
 
     WireCell::Spng::RayGrid::Coordinates m_raygrid_coords =
             WireCell::Spng::RayGrid::Coordinates(m_raygrid_views);
-    m_raygrid_coords.to(device);
-    
-    // std::cout << "Active bounds: " << m_raygrid_coords.active_bounds() << std::endl;
-    // auto active_bounds = m_raygrid_coords.active_bounds();
+    m_raygrid_coords.to(m_device);
 
-
-    // auto element_tensor_n = torch::zeros({m_plane_nwires[m_target_plane_index]/*active_bounds.index({4, 1}).item<int>()*/},torch::TensorOptions().dtype(torch::kInt32));
-    // auto element_tensor_m = torch::zeros({m_plane_nwires[m_aux_plane_m_index]/*active_bounds.index({3, 1}).item<int>()*/},torch::TensorOptions().dtype(torch::kInt32));
-    // auto element_tensor_l = torch::zeros({m_plane_nwires[m_aux_plane_l_index]/*active_bounds.index({2, 1}).item<int>()*/},torch::TensorOptions().dtype(torch::kInt32));
-    
-    
-    // auto element_m_accessor = element_tensor_m.accessor<int, 1>();
-    // auto element_l_accessor = element_tensor_l.accessor<int, 1>();
-    // auto element_n_accessor = element_tensor_n.accessor<int, 1>();
-
-    // m_raygrid_coords.to(device);
+    m_plane_channels_to_wires[m_target_plane_index] = m_plane_channels_to_wires[m_target_plane_index].to(m_device);
 
     //Clone the inputs  
-    auto target_tensor_n = (*in->tensors())[m_target_plane_index]->tensor().clone().to(device);
+    auto target_tensor_n = (*in->tensors())[m_target_plane_index]->tensor().clone().to(m_device);
     // target_tensor_n.index_put_({0, Slice(), Slice()}, 0.);
     // target_tensor_n.index_put_({0, 317, 4887}, 1.);
     auto target_tensor_map = (*in->tensors())[m_target_plane_index]->metadata()["channel_map"];
@@ -220,7 +231,7 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
     }
 
 
-    auto aux_tensor_l = (*in->tensors())[m_aux_plane_l_index]->tensor().clone().to(device);
+    auto aux_tensor_l = (*in->tensors())[m_aux_plane_l_index]->tensor().clone().to(m_device);
     // aux_tensor_l.index_put_({0, Slice(), Slice()}, 0.);
     // aux_tensor_l.index_put_({0, 104, 4887}, 1.);
     auto aux_tensor_l_map = (*in->tensors())[m_aux_plane_l_index]->metadata()["channel_map"];
@@ -233,7 +244,7 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
         output_file.close();
     }
 
-    auto aux_tensor_m = (*in->tensors())[m_aux_plane_m_index]->tensor().clone().to(device);
+    auto aux_tensor_m = (*in->tensors())[m_aux_plane_m_index]->tensor().clone().to(m_device);
     // aux_tensor_m.index_put_({0, Slice(), Slice()}, 0.);
     // aux_tensor_m.index_put_({0, 544, 4887}, 1.);
     auto aux_tensor_m_map = (*in->tensors())[m_aux_plane_m_index]->metadata()["channel_map"];
@@ -247,25 +258,10 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
     }
 
     //Transform into bool tensors (activities)
-    auto tester = torch::zeros({1}).to(device);
+    auto tester = torch::zeros({1}).to(m_device);
     torch::nn::MaxPool1d pool(torch::nn::MaxPool1dOptions(4));
     aux_tensor_l = (pool(aux_tensor_l) > tester);
     aux_tensor_m = (pool(aux_tensor_m) > tester);
-
-    // auto active_l = (aux_tensor_l > tester).nonzero();
-    // auto active_m = (aux_tensor_m > tester).nonzero();
-
-    // std::cout << "active l\n" << active_l << std::endl;
-
-    // std::cout << "l map " << aux_tensor_l_map.size() << std::endl;
-    // auto l_map_tensor = torch::zeros(aux_tensor_l_map.size(), torch::TensorOptions().dtype(torch::kInt64));
-    // auto l_map_accessor = l_map_tensor.accessor<long,1>();
-    // for (const auto & key : aux_tensor_l_map.getMemberNames()) {
-    //     int index = std::stoi(key);
-    //     // std::cout << index << " " << aux_tensor_l_map[key] << std::endl;
-    //     l_map_accessor[index] = aux_tensor_l_map[key].asInt();
-    // }
-    // l_map_tensor = l_map_tensor.to(device);
 
     target_tensor_n = pool(target_tensor_n);
 
@@ -273,8 +269,8 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
         target_tensor_n.size(0),
         m_plane_nwires[m_target_plane_index],
         target_tensor_n.size(-1)},
-        torch::TensorOptions(device).dtype(torch::kFloat64));
-    torch::Tensor output_tensor_inactive = torch::zeros_like(output_tensor_active, torch::TensorOptions(device).dtype(torch::kFloat64));
+        torch::TensorOptions(m_device).dtype(torch::kFloat64));
+    torch::Tensor output_tensor_inactive = torch::zeros_like(output_tensor_active, torch::TensorOptions(m_device).dtype(torch::kFloat64));
 
 
     auto l_rows = aux_tensor_l.index({0, m_plane_wires_to_channels[m_aux_plane_l_index], torch::indexing::Slice()});
@@ -285,139 +281,35 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
     //     aux_tensor_l.size(0),
     //     m_plane_nwires[m_aux_plane_l_index],
     //     aux_tensor_l.size(-1)},
-    //     torch::TensorOptions(device).dtype(torch::kFloat64));
+    //     torch::TensorOptions(m_device).dtype(torch::kFloat64));
     // torch::Tensor output_m_wires = torch::zeros({
     //     aux_tensor_m.size(0),
     //     m_plane_nwires[m_aux_plane_m_index],
     //     aux_tensor_m.size(-1)},
-    //     torch::TensorOptions(device).dtype(torch::kFloat64));
+    //     torch::TensorOptions(m_device).dtype(torch::kFloat64));
 
     torch::Tensor output_l_blobs = torch::zeros({
         aux_tensor_l.size(0),
         m_plane_nwires[m_aux_plane_l_index],
         aux_tensor_l.size(-1)},
-        torch::TensorOptions(device).dtype(torch::kFloat64));
+        torch::TensorOptions(m_device).dtype(torch::kFloat64));
     torch::Tensor output_m_blobs = torch::zeros({
         aux_tensor_m.size(0),
         m_plane_nwires[m_aux_plane_m_index],
         aux_tensor_m.size(-1)},
-        torch::TensorOptions(device).dtype(torch::kFloat64));
+        torch::TensorOptions(m_device).dtype(torch::kFloat64));
 
     //Apply the first two 'real' layers -- the order doesn't matter?
     // auto coords = m_raygrid_coords[0]; // For testing -- just one side of the APA
 
     // std::cout << "Trivial Blobs" << m_trivial_blobs << std::endl;
     for (long int irow = 0; irow < aux_tensor_l.sizes().back(); ++irow) {
-        //Reset the elements
-        // element_tensor_l.index_put_({torch::indexing::Slice()}, 0);
-        // element_tensor_m.index_put_({torch::indexing::Slice()}, 0);
-        // element_tensor_n.index_put_({torch::indexing::Slice()}, 0);
-        
-        // auto l_row = aux_tensor_l.index({0, torch::indexing::Slice(), irow});
-        // auto m_row = aux_tensor_m.index({0, torch::indexing::Slice(), irow});
-        // auto target_row = target_tensor_n.index({0, torch::indexing::Slice(), irow});
-        
-        // auto l_row = aux_tensor_l.index({0, m_plane_wires_to_channels[m_aux_plane_l_index], irow});
+
         auto l_row = l_rows.index({Slice(), irow});
-        // auto m_row = aux_tensor_m.index({0, m_plane_wires_to_channels[m_aux_plane_m_index], irow});
         auto m_row = m_rows.index({Slice(), irow});
-        // auto target_row = target_tensor_n.index({0, m_plane_wires_to_channels[m_target_plane_index], irow});
         auto target_row = target_rows.index({Slice(), irow});
 
-        // auto l_row_nonzero = l_row.nonzero();
-        // if (l_row_nonzero.size(0) > 0) {
-        //     // std::cout << "nonzero\n" << l_row_nonzero << std::endl;
-        //     // std::cout << "Row: " << irow << std::endl;
-        //     // std::cout << "Nonzero l:\n" << l_row.nonzero() << std::endl;
-        //     // std::cout << "Nonzero l converted:\n" << l_map_tensor.index({l_row.nonzero()}) << std::endl;
-
-        //     auto nonzero_accessor = l_row_nonzero.accessor<long, 2>();
-        //     int nonzero_size = nonzero_accessor.size(0);
-        //     // std::cout << "Nonzero size: " << nonzero_size << std::endl;
-        //     for (long int inz = 0; inz < nonzero_size; ++inz) {
-        //         if (nonzero_accessor.size(1) == 0) {
-        //             std::cerr << "Error somehow this is zero?" << std::endl;
-        //         }
-        //         else {
-        //             // std::cout << "nonzero: " << nonzero_accessor[inz][0] << std::endl;
-        //             int mapped_channel = aux_tensor_l_map[std::to_string(nonzero_accessor[inz][0])].asInt();
-        //             const auto & wires = m_chan_id_to_wires[m_aux_plane_l_index][mapped_channel];
-        //             for (const auto & w : wires) {
-        //                 // std::cout << "\t" << w << std::endl;
-        //                 element_l_accessor[w] = 1;
-        //             }
-        //         }
-        //     }
-        //     // std::cout << element_tensor_l << std::endl;
-        // }
-
-        // auto m_row_nonzero = m_row.nonzero();
-        // if (m_row_nonzero.size(0) > 0) {
-        //     // std::cout << "nonzero\n" << m_row_nonzero << std::endl;
-        //     // std::cout << "Row: " << irow << std::endl;
-        //     // std::cout << "Nonzero l:\n" << m_row.nonzero() << std::endl;
-        //     // std::cout << "Nonzero l converted:\n" << m_map_tensor.index({m_row.nonzero()}) << std::endl;
-
-        //     auto nonzero_accessor = m_row_nonzero.accessor<long, 2>();
-        //     int nonzero_size = nonzero_accessor.size(0);
-        //     // std::cout << "Nonzero size: " << nonzero_size << std::endl;
-        //     for (long int inz = 0; inz < nonzero_size; ++inz) {
-        //         if (nonzero_accessor.size(1) == 0) {
-        //             std::cerr << "Error somehow this is zero?" << std::endl;
-        //         }
-        //         else {
-        //             // std::cout << "nonzero: " << nonzero_accessor[inz][0] << std::endl;
-        //             int mapped_channel = target_tensor_map[std::to_string(nonzero_accessor[inz][0])].asInt();
-        //             const auto & wires = m_chan_id_to_wires[m_target_plane_index][mapped_channel];
-        //             for (const auto & w : wires) {
-        //                 // std::cout << "\t" << w << std::endl;
-        //                 element_m_accessor[w] = 1;
-        //             }
-        //         }
-        //     }
-        //     // std::cout << element_tensor_m << std::endl;
-        // }
-
-        // auto target_row_nonzero = target_row.nonzero();
-        // if (target_row_nonzero.size(0) > 0) {
-        //     // std::cout << "nonzero\n" << target_row_nonzero << std::endl;
-        //     // std::cout << "Row: " << irow << std::endl;
-        //     // std::cout << "Nonzero l:\n" << target_row.nonzero() << std::endl;
-        //     // std::cout << "Nonzero l converted:\n" << m_map_tensor.index({target_row.nonzero()}) << std::endl;
-
-        //     auto nonzero_accessor = target_row_nonzero.accessor<long, 2>();
-        //     int nonzero_size = nonzero_accessor.size(0);
-        //     // std::cout << "Nonzero size: " << nonzero_size << std::endl;
-        //     for (long int inz = 0; inz < nonzero_size; ++inz) {
-        //         if (nonzero_accessor.size(1) == 0) {
-        //             std::cerr << "Error somehow this is zero?" << std::endl;
-        //         }
-        //         else {
-        //             // std::cout << "nonzero: " << nonzero_accessor[inz][0] << std::endl;
-        //             int mapped_channel = aux_tensor_m_map[std::to_string(nonzero_accessor[inz][0])].asInt();
-        //             const auto & wires = m_chan_id_to_wires[m_aux_plane_m_index][mapped_channel];
-        //             for (const auto & w : wires) {
-        //                 // std::cout << "\t" << w << std::endl;
-        //                 element_n_accessor[w] = 1;
-        //             }
-        //         }
-        //     }
-        //     // std::cout << element_tensor_n << std::endl;
-        // }
-        // continue;
-        // std::cout << l_row.sizes() << std::endl;
-        // std::cout << torch::any(l_row) << std::endl;
-        // std::cout << l_row << std::endl;
-
-        // std::cout << m_row.sizes() << std::endl;
-        // std::cout << torch::any(m_row) << std::endl;
-        // std::cout << m_row << std::endl;
-
-        // std::cout << target_row.sizes() << std::endl;
-        // std::cout << torch::any(target_row) << std::endl;
-        // std::cout << target_row << std::endl;
-
-        // auto raygrid_row_l = element_tensor_l.to(device);
+        // auto raygrid_row_l = element_tensor_l.to(m_device);
         auto blobs = WireCell::Spng::RayGrid::apply_activity(m_raygrid_coords, m_trivial_blobs, l_row/*raygrid_row_l*/);
 
         // std::cout << "First layer done" << std::endl;
@@ -437,7 +329,7 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
                 1.
             );
         }
-        // auto raygrid_row_m = element_tensor_m.to(device);
+        // auto raygrid_row_m = element_tensor_m.to(m_device);
         blobs = WireCell::Spng::RayGrid::apply_activity(m_raygrid_coords, blobs, m_row/*raygrid_row_m*/);
         // {//Writing blobs with l & m
         //     std::cerr << "writing " << m_output_torch_name << "\n";
@@ -467,11 +359,11 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
         // continue;
         //For the last layer, get the bounds of the would-be created blobs
         //MP3 means our target plane has activity overlapping with blobs from the first 2 layers
-        tester = tester.to(device);
-        // auto raygrid_row_n = element_tensor_n.to(device);
+        tester = tester.to(m_device);
+        // auto raygrid_row_n = element_tensor_n.to(m_device);
         auto target_active = (target_row/*raygrid_row_n*/ > tester);
         // std::cout << target_active << std::endl;
-        // auto one = torch::ones({1}).to(device);
+        // auto one = torch::ones({1}).to(m_device);
         if (target_active.any().item<bool>()) {
             auto mp3_blobs = WireCell::Spng::RayGrid::apply_activity(
                 m_raygrid_coords, blobs, target_active
@@ -533,7 +425,12 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
             // // std::cout << hi_mp2 << std::endl;
         }
     }
-    
+
+    //Have to transform back into channel basis
+    convert_wires_to_channels(output_tensor_active, m_plane_channels_to_wires[m_target_plane_index]);
+    convert_wires_to_channels(output_tensor_inactive, m_plane_channels_to_wires[m_target_plane_index]);
+
+
     // TODO: set md?
     Configuration set_md, mp2_md, mp3_md;
     set_md["tag"] = "";//m_output_set_tag;

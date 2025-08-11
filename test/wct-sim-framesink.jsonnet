@@ -104,6 +104,7 @@ function(outname="tensor_frames.npz", skip_noise="False", do_depo="False") {
   local parallel_pipes = [
     g.pipeline([
                 (if skip_noise == "False" then sn_pipes[n] else signal_pipes[n]),
+                // sn_pipes[n]
               ],
               'parallel_pipe_%d' % n)
     for n in std.range(0, std.length(tools.anodes) - 1)
