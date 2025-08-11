@@ -703,7 +703,7 @@ function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do
 
             local tiling = [
                 g.pnode({
-                    type: 'SPNGFindMPCoincidence',
+                    type: 'SPNGNoTileMPCoincidence',
                     name: 'tiling_%d' % anode.data.ident,
                     data: {
                         anode: wc.tn(anode),
