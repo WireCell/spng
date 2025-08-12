@@ -221,41 +221,41 @@ bool WireCell::SPNG::FindMPCoincidence::operator()(const input_pointer& in, outp
     // target_tensor_n.index_put_({0, Slice(), Slice()}, 0.);
     // target_tensor_n.index_put_({0, 317, 4887}, 1.);
     auto target_tensor_map = (*in->tensors())[m_target_plane_index]->metadata()["channel_map"];
-    {
-        auto name = "target_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(target_tensor_n.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
+    // {
+    //     auto name = "target_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(target_tensor_n.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
 
 
     auto aux_tensor_l = (*in->tensors())[m_aux_plane_l_index]->tensor().clone().to(m_device);
     // aux_tensor_l.index_put_({0, Slice(), Slice()}, 0.);
     // aux_tensor_l.index_put_({0, 104, 4887}, 1.);
     auto aux_tensor_l_map = (*in->tensors())[m_aux_plane_l_index]->metadata()["channel_map"];
-    {
-        auto name = "aux_tensor_l_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(aux_tensor_l.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
+    // {
+    //     auto name = "aux_tensor_l_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(aux_tensor_l.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
 
     auto aux_tensor_m = (*in->tensors())[m_aux_plane_m_index]->tensor().clone().to(m_device);
     // aux_tensor_m.index_put_({0, Slice(), Slice()}, 0.);
     // aux_tensor_m.index_put_({0, 544, 4887}, 1.);
     auto aux_tensor_m_map = (*in->tensors())[m_aux_plane_m_index]->metadata()["channel_map"];
-    {
-        auto name = "aux_tensor_m_" + m_output_torch_name;
-        std::cerr << "writing " << name << "\n";
-        std::ofstream output_file(name, std::ios::out | std::ios::binary);
-        auto data = torch::pickle_save(aux_tensor_m.to(torch::kCPU));
-        output_file.write(data.data(), data.size());
-        output_file.close();
-    }
+    // {
+    //     auto name = "aux_tensor_m_" + m_output_torch_name;
+    //     std::cerr << "writing " << name << "\n";
+    //     std::ofstream output_file(name, std::ios::out | std::ios::binary);
+    //     auto data = torch::pickle_save(aux_tensor_m.to(torch::kCPU));
+    //     output_file.write(data.data(), data.size());
+    //     output_file.close();
+    // }
 
     //Transform into bool tensors (activities)
     auto tester = torch::zeros({1}).to(m_device);

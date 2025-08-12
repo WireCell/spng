@@ -48,6 +48,7 @@ namespace SPNG {
         std::map<int, torch::Tensor> m_plane_wires_to_channels;
         std::map<int, torch::Tensor> m_plane_channels_to_wires;
         std::string m_output_torch_name;
+        bool m_debug_output{false};
 
         
     };
