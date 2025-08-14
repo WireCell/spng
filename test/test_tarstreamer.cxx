@@ -1,5 +1,5 @@
 #include "WireCellSpng/TarStreamer.h"
-
+#include "WireCellSpng/SimpleTorchTensorSet.h"
 int main(int argc, char** argv) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " archive.tar\n";
@@ -27,6 +27,8 @@ int main(int argc, char** argv) {
             }
             else if (e.name.size() >= 4 && e.name.rfind(".npy") == e.name.size() - 4) {
                 auto arr = ts.read_current_npy();
+                //convert arr into a vector of floats
+                std::vector<float> data(arr.data.begin(), arr.data.end());
                 std::cout << "  NPY shape: [";
                 for (size_t i = 0; i < arr.shape.size(); ++i) {
                     std::cout << arr.shape[i] << (i+1<arr.shape.size()? ", ":"");
