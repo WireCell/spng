@@ -36,6 +36,7 @@ struct NpyFloat32 {
     std::vector<float>  data;
 };
 
+
 static inline bool host_is_le() {
     uint16_t x = 1;
     return *reinterpret_cast<uint8_t*>(&x) == 1;
@@ -162,6 +163,24 @@ public:
         in_.open(tar_path, std::ios::binary);
         if (!in_) throw std::runtime_error("Failed to open tar: " + tar_path_);
         total_files_ = count_entries_();
+    }
+
+    //Want something that iterates and restores the iterator state
+    struct bookmark{
+        std::streampos pos;
+        size_t files_read;
+        Entry current;
+    };
+
+    bookmark bm() const{
+        return bookmark{in_.tellg(), files_read_, cur_};
+    };
+
+    void restore(const bookmark& b){
+        in_.clear(); // clear any eof flags
+        in_.seekg(b.pos);
+        files_read_ = b.files_read;
+        cur_ = b.current;
     }
 
     // Move to next entry; returns false at end
