@@ -13,6 +13,7 @@
 #include <string>
 #include <tuple>
 
+
 //read the tag to get the apa, filter-name and filter-type information
 std::tuple<int, std::string, std::string> parseTag(const std::string& tag) {
     std::istringstream ss(tag);
@@ -88,15 +89,16 @@ void ROITests::configure(const WireCell::Configuration& cfg)
        log->debug("using output scale: {}", m_cfg.output_scale);
    }
    m_is_gpu = get(cfg, "is_gpu", m_is_gpu);
-
-   //TODO AB: Other configuration parameters that needs to be forwarded to the TorchService
-  // m_forward = Factory::find_tn<ITorchForward>(m_cfg.forward);
+   m_cfg.forward = get(cfg, "forward", m_cfg.forward);
+   log->debug("ROITests: Configured with input_scale: {}, input_offset: {}, output_scale: {}, output_offset: {}, is_gpu: {}, forward: {}",
+                m_cfg.input_scale, m_cfg.input_offset, m_cfg.output_scale, m_cfg.output_offset, m_is_gpu, m_cfg.forward);
+  
    try{
     m_forward = Factory::find_tn<ITorchForward>(m_cfg.forward);
    }
    catch (const std::exception& e) {
-       log->debug("ROITests: Failed to find TorchService instance with name: {}", m_cfg.forward);
-       THROW(ValueError() << errmsg{"Failed to find TorchService instance"});
+       log->debug("ROITests: Failed to find TorchForward instance with name: {}", m_cfg.forward);
+       THROW(ValueError() << errmsg{"Failed to find TorchForward instance"});
    }
 }
 
@@ -154,6 +156,12 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
         }
 
         torch::Tensor scaled = tensor*m_cfg.input_scale + m_cfg.input_offset;
+
+        if(i==0){
+            //save scaled tensor
+            save_torchtensor_data(scaled, "scaled_tensor_0.pt");
+        }
+
         //  ch_eigen.push_back(Array::downsample(arr, m_cfg.tick_per_slice, 1));
         auto tick_per_slice = m_cfg.tick_per_slice;
         auto nticks = tensor.size(1); //0 is channel, 1 is time
@@ -161,11 +169,25 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
         //keep all the dimensions unchanged, select range from 0, nticks_ds* tick_per_slice
         //This will downsample the tensor by tick_per_slice
         auto trimmed = tensor.index({"...",torch::indexing::Slice(0, nticks_ds * tick_per_slice)}); 
+        //save the trimmed tensor
+        if(i==0){
+            save_torchtensor_data(trimmed, "trimmed_tensor_0.pt");
+        }
+
         //now reshape the tensor
         auto reshaped = trimmed.view({tensor.size(0), nticks_ds, tick_per_slice});
+        //save the reshaped tensor
+        if(i==0){
+            save_torchtensor_data(reshaped, "reshaped_tensor_0.pt");
+        }
         //reshaped tensor has the dimensions [channels, downsampled_time, tick_per_slice]
         //now take the mean along the last dimension (tick_per_slice)
         auto downsampled = reshaped.mean(2);
+        //save the downsampled tensor
+        if(i==0){   
+            save_torchtensor_data(downsampled, "downsampled_tensor_0.pt");
+        }
+
         //now cscale and offset the downsampled tensor
         auto dscaled = downsampled * m_cfg.input_scale + m_cfg.input_offset;
         auto nchannels = dscaled.size(0); //number of channels 
@@ -187,6 +209,7 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
     //img is now a 3D stacked tensors 
     auto transposed = img.transpose(1,2); //transposition into ntags, nticks_ds, nchannels
     auto batch = torch::unsqueeze(transposed, 0); //add a batch dimension at the start
+    //chunking -->Check the edging effects.
     auto chunks = batch.chunk(m_cfg.nchunks, 2); // chunk the batch into m_cfg.nchunks along the time dimension (2)
     std::vector<torch::Tensor> outputs;
     for (auto& chunk : chunks) {
@@ -197,18 +220,22 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
         log->debug("ROITests: ITorchTensorSet shape: {}", tensor_shape_string(iitens->tensors()->at(0)->tensor()));
         log->debug("ROITests: Forwarding chunk with shape: {} from inputs of shape {}", tensor_shape_string(iitens->tensors()->at(0)->tensor()),tensor_shape_string(chunk));
         auto oitens = m_forward->forward(iitens);
-        log->debug("ROITests: Output chunk shape: {}", tensor_shape_string(oitens->tensors()->at(0)->tensor()));
+        //log->debug("ROITests: Output chunk shape: {}", tensor_shape_string(oitens->tensors()->at(0)->tensor()));
         //torch::Tensor out_chunk = oitens.toTensor().to(torch::kCUDA); // keep the data in gpu if needed for other stuff.
         torch::Tensor out_chunk = from_itensor(oitens, m_is_gpu)[0].toTensor().cpu(); // convert ITorchTensorSet to torch::Tensor
+        //AB: Mostly for the debugging purposes, we can remove it later.
+       // torch::Tensor out_chunk = from_itensor(iitens, m_is_gpu)[0].toTensor().cpu(); // convert ITorchTensorSet to torch::Tensor
         outputs.push_back(out_chunk);
     }
     
     torch::Tensor out_tensor = torch::cat(outputs, 2); // concatenate the output chunks along the time dimension (2)
-
+    //save the out_tensor
+    save_torchtensor_data(out_tensor, "out_tensor.pt");
     auto mask = out_tensor.gt(m_cfg.mask_thresh);
     auto finalized_tensor = out_tensor*mask.to(out_tensor.dtype()); // apply the mask to the output tensor  
     finalized_tensor = finalized_tensor * m_cfg.output_scale + m_cfg.output_offset; // scale and offset the output tensor
-    
+    //save the finalized tensor
+    save_torchtensor_data(finalized_tensor, "finalized_tensor.pt");
     //std::vector<ITorchTensor::pointer>processed_tensors;
     auto shared_vec = std::make_shared<ITorchTensor::vector>();
     for(int i = 0; i < finalized_tensor.size(0); ++i) {
@@ -221,6 +248,8 @@ bool ROITests::operator()(const input_pointer& in, output_pointer& out)
     out = std::make_shared<SimpleTorchTensorSet>(
         in->ident(), in->metadata(), shared_vec
     );
+    //save out tensor set
+    save_simpletensor_data(out, "out_tensor_set.pt");
     
     return true;
 }

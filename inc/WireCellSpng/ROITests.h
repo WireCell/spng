@@ -8,6 +8,7 @@
 #include "WireCellIface/IConfigurable.h"
 #include "WireCellSpng/ITorchSpectrum.h"
 
+
 namespace WireCell {
     namespace SPNG {
         struct DNNROIFindingCfg {
