@@ -70,6 +70,8 @@ namespace WireCell::SPNG {
     //                                     const std::vector<torch::Tensor>& responses,
     //                                     torch::IntArrayRef extra_shape = {0,0});
     
+    void save_torchtensor_data(const torch::Tensor& tensor, const std::string& filename);
+    void save_simpletensor_data(const ITorchTensorSet::pointer& in, const std::string& filename);
     std::vector<torch::IValue> from_itensor(const ITorchTensorSet::pointer& in, bool is_gpu = false);
     
     ITorchTensorSet::pointer to_itensor(const std::vector<torch::IValue>& inputs);

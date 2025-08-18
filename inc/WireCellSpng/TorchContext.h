@@ -4,6 +4,7 @@
 
 //#include "WireCellIface/ISemaphore.h"
 #include "WireCellSpng/Torch.h"
+#include <torch/torch.h>
 
 namespace WireCell::SPNG {
 
@@ -33,7 +34,7 @@ namespace WireCell::SPNG {
 
       private:
 
-        torch::Device m_dev{torch::kCPU};
+        torch::Device m_dev{torch::kCUDA}; //kCUDA or kCPU
         std::string m_devname{""};
      };
 

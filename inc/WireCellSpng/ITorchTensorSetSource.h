@@ -7,7 +7,7 @@
 
 namespace WireCell {
 
-    /** A frame source is something that generates IFrames.
+    /** A frame source is something that generates ITensorSet.
      */
     class ITorchTensorSetSource : public ISourceNode<ITorchTensorSet> {
        public:

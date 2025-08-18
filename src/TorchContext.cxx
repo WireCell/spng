@@ -12,6 +12,7 @@ TorchContext::TorchContext(const std::string& devname)
 }
 void TorchContext::connect(const std::string& devname)
 {
+    std::cout<<"Connecting to Torch device: " << devname << std::endl;
     // Use almost 1/2 the memory and 3/4 the time.
     torch::NoGradGuard no_grad;
 
@@ -26,4 +27,5 @@ void TorchContext::connect(const std::string& devname)
         m_dev = torch::Device(torch::kCUDA, devnum);
     }
     m_devname = devname;
+    std::cout << "Connected to Torch device: " << m_devname << std::endl;
 }

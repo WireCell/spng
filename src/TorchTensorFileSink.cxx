@@ -103,9 +103,10 @@ bool TorchTensorFileSink::operator()(const ITorchTensorSet::pointer &in)
     const std::string sident = std::to_string(in->ident());
     auto tens = in->tensors();
     const size_t ntens = tens->size();
-
+    log->debug("size of tensor set: {}", ntens);
     jsonify(in->metadata(), pre + "set_" + sident + "_metadata.json");
-    for (size_t ind=0; ind<ntens; ++ind) {
+    //for (size_t ind=0; ind<ntens; ++ind) {
+    for (size_t ind=0; ind< std::min(ntens, size_t(5)); ++ind) { // only first 5 tensors
         auto ten = tens->at(ind);
         const std::string ppre = pre + "_" + sident + "_" + std::to_string(ind);
         jsonify(ten->metadata(), ppre + "_metadata.json");

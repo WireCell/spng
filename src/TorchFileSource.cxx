@@ -5,6 +5,7 @@
 #include "WireCellSpng/SimpleTorchTensor.h"
 #include "WireCellSpng/SimpleTorchTensorSet.h"  
 #include "WireCellUtil/NamedFactory.h"
+#include "WireCellUtil/Persist.h"
 
 WIRECELL_FACTORY(TorchFileSource, WireCell::SPNG::TorchFileSource,
                  WireCell::INamed,
@@ -97,6 +98,7 @@ WireCell::Configuration TorchFileSource::default_configuration() const
     cfg["inname"] = m_inname;
     cfg["prefix"] = m_prefix;
     cfg["tag"] = m_tag; // tag to filter entries by
+
     return cfg;
 }
 
@@ -105,8 +107,9 @@ void TorchFileSource::configure(const WireCell::Configuration& cfg)
     m_inname = get(cfg, "inname", m_inname);
     m_prefix = get(cfg, "prefix", m_prefix);
     m_tag = get(cfg, "tag", m_tag);
-
     m_tar_streamer.open(m_inname);
+
+
 }
 
 void TorchFileSource::finalize(){}
@@ -115,13 +118,15 @@ void TorchFileSource::clear(){}
 
 bool TorchFileSource::operator()(output_pointer &out)
 {
+    
     auto tot_files = m_tar_streamer.total_files();
+    std::cout<<"Total entries: " << tot_files << "\n";
     std::vector<torch::Tensor> tensors;
     if (tot_files == 0) {
         log->debug("No entries in tar file: {}", m_inname);
-        return true; // if empty, pass EOS 
+        return false; // if empty, do not send anything
     }
-    tensors.resize(tot_files/2); 
+    tensors.reserve(tot_files/2); 
 
     while(m_tar_streamer.next()) {
         auto entry = m_tar_streamer.current();
@@ -163,7 +168,13 @@ bool TorchFileSource::operator()(output_pointer &out)
     for (const auto& t : tensors) {
         tmp_vec.emplace_back(std::make_shared<SimpleTorchTensor>(t));
     }
+    log->debug("Read {} tensors from tar file", tmp_vec.size());
+    if (tmp_vec.empty()) {
+        log->debug("No tensors found in tar file: {}", m_inname);
+        return false; // if empty, do not send anything
+    }
     tensor_ptrs = std::make_shared<std::vector<ITorchTensor::pointer>>(std::move(tmp_vec));
     out = std::make_shared<SimpleTorchTensorSet>(0, Json::nullValue, tensor_ptrs);
+    
     return true; // if empty, pass EOS
 }

@@ -33,10 +33,10 @@ namespace WireCell::SPNG {
         // safe.  However .forward() is not const so we must make this
         // mutable.
         mutable torch::jit::script::Module m_module;
+        torch::Device m_device{torch::kCPU}; // Default to CPU
 
         // Even though thread safe, we want to honor a per device
         // semaphore to give user chance ot limit us.
-        TorchContext m_ctx;
 
     };
 }  // namespace WireCell::SPNG

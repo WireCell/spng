@@ -14,7 +14,18 @@ local wc = import 'wirecell.jsonnet';
 
 // function make_wpid(tools)
 {
+
+
     make_spng :: function(tools, debug_force_cpu=false, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) {
+
+        local SPNGTorchService = {
+            type: "SPNGTorchService",
+            name: "dnnroi",
+            data: {
+                model: "/nfs/data/1/abashyal/spng/spng_dev_050525/toolkit/spng/test/ts-model/test-2.3.ts",
+                device: "gpu",
+            },
+        },
 
         local ROI_loose_lf = {
             data: {
@@ -427,6 +438,7 @@ local wc = import 'wirecell.jsonnet';
             },
 
 
+
             local apply_wiener_tight = g.pnode({
                 type: 'SPNGApply1DSpectrum',
                 name: 'spng_wiener_tight_apa%d_plane%d' % [anode.data.ident, iplane],
@@ -560,6 +572,8 @@ local wc = import 'wirecell.jsonnet';
                     output_set_tag: 'collated_%d' % iplane,
                     // multiplicity: (if iplane < 2 then 5 else 2),
                     multiplicity: (if iplane < 2 then 6 else 2),
+                    plane: iplane,
+                    apa: anode.data.ident,
                 },
             // }, nin=if iplane < 2 then 5 else 2, nout=1),
             }, nin=if iplane < 2 then 6 else 2, nout=1),
@@ -661,7 +675,7 @@ local wc = import 'wirecell.jsonnet';
         }.ret,
 
         // local tf_fans = [make_fanout(a) for a in tools.anodes],
-        
+
         local spng_fanout(anode, apply_gaus=true, do_roi_filters=false, do_collate_apa=false) = {
             #FrameToTorchSetFanout
             local tf_fan = make_fanout(anode),
@@ -708,16 +722,27 @@ local wc = import 'wirecell.jsonnet';
                 data: {
                     output_set_tag: 'apa_collated',
                     multiplicity:4,
+                    apa: anode.data.ident,
+                    plane: -1,  // -1 means all planes
                 },
             }, nin=4, nout=1),
             local spng_roi_apa = g.pnode({
                 type: 'SPNGROITests',
                 name: 'spng_roi_apa%d' % [anode.data.ident],
                 data:{
-                    "apa": anode.data.ident,
-                    
+                    apa: anode.data.ident,
+                    plane: -1,  // -1 means all planes
+                    input_scale: 1.0/4000,
+                    input_offset:0.0,
+                    mask_threshold: 0.5,
+                    output_scale: 1.0,
+                    output_offset: 0.0,
+                    nchunks: 4,
+                    forward: wc.tn(SPNGTorchService),
+                    decon_charge_tag: 'decon_charge%d' %[anode.data.ident],
+
                  },
-            }, nin=1, nout=1
+            }, nin=1, nout=1, uses=[SPNGTorchService],
             ),
             local torch_to_tensors_apa = g.pnode({
                 type: 'TorchToTensor',

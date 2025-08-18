@@ -116,9 +116,6 @@ namespace WireCell {
             
             //AB: Forward the pointer
             ITorchForward::pointer m_forward{nullptr};
-            //IFrame::traces_t m_traces; // input traces
-            //Equivalent of IFrame::traces_t but for Torch tensors
-            //ITorchTensorSet::pointer m_tensors; // input tensors
             
             
             //std::shared_ptr<ITorchSpectrum> base_frer_spectrum, base_wire_filter;

@@ -2,140 +2,96 @@
 #include "WireCellUtil/Exceptions.h"
 #include "WireCellSpng/SimpleTorchTensorSet.h"
 #include "WireCellSpng/SimpleTorchTensor.h"
-
 #include <cmath>
+#include <iostream>
+#include <fstream>
+#include <map>
 
 namespace WireCell::SPNG {
-    /*
-    torch::Tensor gaussian1d(double mean, double sigma,
-                                    int64_t npoints, double xmin, double xmax,
-                                    torch::TensorOptions options)
-    {
-        auto x = torch::linspace(xmin, xmax, npoints, options);
-        auto rel = (x - mean)/sigma;
-        const double norm = sqrt(2*M_PI*sigma*sigma);
-        return norm * torch::exp(-0.5*rel*rel);
-    }
-
-
-    std::vector<int64_t> linear_shape(const std::vector<torch::Tensor>& tens, 
-                                            torch::IntArrayRef extra_shape)
-    {
-        // Find shape that assures linear convolution.
-        std::vector<int64_t> shape = {extra_shape[0], extra_shape[1]};
-        for (const auto& ten : tens) {
-            auto sizes = ten.sizes();
-            shape[0] += sizes[0] - 1;
-            shape[1] += sizes[1] - 1;
+    
+    void save_torchtensor_data(const  torch::Tensor& tensor, const std::string& filename) {
+        // Create a map<string, torch::Tensor> to hold the tensor with a unique key
+        torch::serialize::OutputArchive archive;
+    
+        // Store the tensor with a unique key
+        archive.write("tensor", tensor);
+    
+        try {
+            // Save the tensor in one file
+            archive.save_to(filename);
+        } catch (const c10::Error& e) {
+            std::cerr << "Util::save_torchtensor_data  Error saving tensor: " << e.what() << std::endl;
         }
-        return shape;
-    }
+    }  
+    
+    void save_simpletensor_data(const ITorchTensorSet::pointer& in, const std::string& filename) {
+        // Create a map<string, torch::Tensor> to hold all tensors with unique keys
+        torch::serialize::OutputArchive archive;
+    
+        int idx = 0;
+        for (const auto& tensor : *in->tensors()) {
+            auto ten = tensor->tensor();
+    
 
-
-    torch::Tensor pad(torch::Tensor ten, double value, torch::IntArrayRef shape)
-    {
-        using torch::indexing::Slice;
-
-        torch::Tensor padded = torch::zeros(shape, ten.options()) + value;
-        auto s = ten.sizes();
-        padded.index_put_({
-                Slice(0,std::min(s[0], shape[0])),
-                Slice(0,std::min(s[1], shape[1]))
-            }, ten);
-        return padded;    
-    }
-
-    torch::Tensor convo_spec(const std::vector<torch::Tensor>& tens, 
-                                    torch::IntArrayRef shape)
-    {
-        using torch::indexing::Slice;
-
-        // Return value will be complex spectrum in Fourier domain.
-        torch::Tensor fourier;
-        // Allocate working array in interval domain.
-        torch::Tensor interval = torch::zeros(shape, tens[0].options());
-
-        const size_t ntens = tens.size();
-
-        // First, accumulate denominator.
-        for (size_t ind=0; ind<ntens; ++ind) {
-            // Caveat: zero-padding is not always appropriate for every ten in tens.
-            interval.zero_();
-
-            const auto& ten = tens[ind];
-            auto s = ten.sizes();
-            interval.index_put_({
-                    Slice(0,std::min(s[0], shape[0])),
-                    Slice(0,std::min(s[1], shape[1]))
-                }, ten);
-
-            if (ind == 0) {
-                fourier = torch::fft::fft2(interval);
-            }
-            else {
-                fourier *= torch::fft::fft2(interval);
-            }
+    
+            // Move tensor to CPU if needed for portability
+            torch::Tensor cpu_tensor = ten.device().is_cpu() ? ten : ten.to(torch::kCPU);
+    
+            // Store with a unique key
+            std::string key = "tensor_" + std::to_string(idx++);
+            archive.write(key, cpu_tensor);
         }
-
-        return fourier;
-    }
-
-
-    torch::Tensor filtered_decon_2d(const std::vector<torch::Tensor>& numerator,
-                                        const std::vector<torch::Tensor>& denominator,
-                                        torch::IntArrayRef shape)
-    {
-        if (denominator.empty()) {  // graceful degradation 
-            return convo_spec(numerator, shape);
+    
+        try {
+            // Save the entire map of tensors in one file
+            archive.save_to(filename);
+        } catch (const c10::Error& e) {
+            std::cerr << "Util::save_simpletensor_data  Error saving tensors: " << e.what() << std::endl;
         }
-
-        // Note: this suffers holding an extra array which could be avoided by
-        // accumulating denominator convolutions, inverting that result and
-        // continuing accumulating numerator convolutions.
-        auto num = convo_spec(numerator, shape);
-        auto den = convo_spec(denominator, shape);
-        return torch::divide(num, den); // fixme, divide-by-zero?
     }
+    
 
+    
+    
 
-    torch::Tensor filtered_decon_2d_auto(const std::vector<torch::Tensor>& numerator,
-                                            const std::vector<torch::Tensor>& denominator,
-                                            torch::IntArrayRef extra_shape)
-    {
-        std::vector<torch::Tensor> all_in(numerator.begin(), numerator.end());
-        all_in.insert(all_in.end(), denominator.begin(), denominator.end());
-
-        if (all_in.empty()) {
-            return torch::Tensor();
-        }
-
-        auto shape = linear_shape(all_in, extra_shape);
-
-        return filtered_decon_2d(numerator, denominator, shape);
-    }
-    */
-    ITorchTensorSet::pointer to_itensor( const std::vector<torch::IValue>& inputs){
+    ITorchTensorSet::pointer to_itensor(const std::vector<torch::IValue>& inputs) {
         auto itv = std::make_shared<ITorchTensor::vector>();
-        // Populate this function as needed...
-
-        for (const auto& ivalue : inputs) {
-            if (!ivalue.isTensor()) {
-                THROW(ValueError() << errmsg{"Expected torch::IValue to be a Tensor"});
+    
+        for (size_t i = 0; i < inputs.size(); ++i) {
+            try {
+                const auto& ivalue = inputs[i];
+                if (!ivalue.isTensor()) {
+                    std::cerr << "Error: Expected torch::IValue at index " << i << " to be a Tensor\n";
+                    continue;
+                }
+                torch::Tensor ten = ivalue.toTensor();
+    
+    
+                if (ten.dim() != 4) {
+                    std::cerr << "Error: Tensor at index " << i << " must be 4D, got " << ten.dim() << std::endl;
+                    continue;
+                }
+    
+                if(ten.scalar_type() != torch::kFloat32) {
+                    ten = ten.to(torch::kFloat32);
+                    std::cout << "Converted tensor " << i << " to float32." << std::endl;
+                }
+    
+                std::cout << "Tensor " << i << ": shape=" << ten.sizes() 
+                << ", dtype=" << ten.dtype() 
+                << ", device=" << ten.device() << std::endl;
+    
+                // No forced dtype or device conversion here to preserve input tensors as-is
+                auto stp = std::make_shared<SimpleTorchTensor>(ten);
+                itv->emplace_back(stp);
+    
+            } catch (const std::exception& e) {
+                std::cerr << "Exception caught while processing tensor " << i << ": " << e.what() << std::endl;
+            } catch (...) {
+                std::cerr << "Unknown exception caught while processing tensor " << i << std::endl;
             }
-            torch::Tensor ten = ivalue.toTensor().cpu();
-            if (ten.dim() != 4) {
-                THROW(ValueError() << errmsg{"Tensor must be 4D"});
-            }
-
-            //why casting to float?
-            if (ten.scalar_type() != torch::kFloat32) {
-                ten = ten.to(torch::kFloat32);
-            }
-            //From torch tensor to ITorchTensor
-            auto stp = std::make_shared<SimpleTorchTensor>(ten);
-            itv->emplace_back(stp);
         }
-        return std::make_shared<SimpleTorchTensorSet>(0,Json::nullValue, itv);
+        return std::make_shared<SimpleTorchTensorSet>(0, Json::nullValue, itv);
     }
 
     //ITorchTensor --> torch::IValue

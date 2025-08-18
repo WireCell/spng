@@ -8,11 +8,6 @@
 #include "WireCellAux/Logger.h"
 #include "WireCellUtil/Stream.h"
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wpedantic"
-#include <boost/iostreams/filtering_stream.hpp>
-#pragma GCC diagnostic pop
-
 namespace WireCell::SPNG {
 
 class TorchFileSource : public Aux::Logger, public ITorchTensorSetSource,
@@ -39,8 +34,10 @@ private:
     std::string m_prefix{""};
     std::string m_tag{""}; // tag to filter entries by
     istream_t m_in; // 
+    std::string m_model_path{""}; // path to the TorchScript model
     std::ifstream tarfile;
     TarStreamer m_tar_streamer;
+    //torch::jit::script::Module m_module;
 
 
 

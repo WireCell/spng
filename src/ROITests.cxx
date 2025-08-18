@@ -38,7 +38,7 @@ WIRECELL_FACTORY(SPNGROITests,// name of the factory
     WireCell::SPNG::ROITests, // name of the class
     WireCell::INamed, // name of the interface 1 (allows object to have unique name)
     WireCell::ITorchTensorSetFilter, // interface 2 (process ITorchTensorSet)
-    //WireCell::SPNG::ITorchForward, //interface 2 (process ITorchForward)
+    WireCell::SPNG::ITorchForward, //interface 2 (process ITorchForward)
     WireCell::IConfigurable // interface 3 (allows configuration)
     )
 
@@ -94,7 +94,7 @@ void ROITests::configure(const WireCell::Configuration& cfg)
                 m_cfg.input_scale, m_cfg.input_offset, m_cfg.output_scale, m_cfg.output_offset, m_is_gpu, m_cfg.forward);
   
    try{
-    m_forward = Factory::find_tn<ITorchForward>(m_cfg.forward);
+    m_forward = Factory::find_tn<ITorchForward>(get(cfg, "forward", m_cfg.forward));
    }
    catch (const std::exception& e) {
        log->debug("ROITests: Failed to find TorchForward instance with name: {}", m_cfg.forward);

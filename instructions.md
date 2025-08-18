@@ -97,4 +97,12 @@ wirecell-pgraph dotify  -V elecGain=7.8 -V SPNG=1 wct-framesource_new.jsonnet ou
 ```bash
 wirecell-pgraph dotify -V elecGain=7.8 -V SPNG=1 -V ApplyGaus=1 -V ROI=1 -V CollateAPAs=1  wct-framesource_new.jsonnet output_spng_roi.pdf
 ```
+## 
+```bash
+file /nfs/data/1/abashyal/spng/spng_dev_050525/toolkit/spng/test/ts-model/unet-l23-cosmic500-e50-new.ts
+```
 
+## Content of the ts file
+```bash
+ unzip -v /nfs/data/1/abashyal/spng/spng_dev_050525/toolkit/spng/test/ts-model/unet-l23-cosmic500-e50-new.ts 
+```
