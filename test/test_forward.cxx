@@ -15,13 +15,6 @@
 #include <fstream>
 
 
-// Signal handler to help debug crashes
-void crash_handler(int sig) {
-    std::cerr << "Segmentation fault caught! Signal: " << sig << std::endl;
-    exit(1);
-}
-
-//TODO: Add a dummy abstract class so that TestInterface Inherits from it.
 
 class TestBase {
 public:
@@ -130,7 +123,6 @@ void TestInterface::configure(const WireCell::Configuration& cfg)
 
 int main(int argc, const char* argv[])
 {
-    signal(SIGSEGV, crash_handler);
     // Create an instance of TestInterface using WireCell::Factory
     auto test_interface = std::make_shared<TestInterface>();
     WireCell::Configuration cfg;
@@ -144,22 +136,6 @@ int main(int argc, const char* argv[])
     }
     
     std::cout<<"TestInterface: Configuring with model path: "<<model_path<<std::endl;
-    std::cout.flush(); //output before the crash..
-    //also test torch::jit::stand alone...
-    //torch::jit::script::Module module;
-    /*
-    if(torch::cuda::is_available()) {
-        try {
-            torch::Device device = torch::Device(torch::kCUDA, 0);
-            auto module = torch::jit::load(model_path, device);
-            std::cout << "Standalone torch::jit::load succeeded." << std::endl;
-        } catch (const std::exception& e) {
-            std::cerr << "Error loading model: " << e.what() << std::endl;
-            return 1;
-        }
-    }
-    */
-    //now test with the interface...
      test_interface->configure(cfg);
 
 return 0;
