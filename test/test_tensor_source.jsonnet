@@ -6,7 +6,8 @@ function() {
         type: 'TensorFileSource',
         name: 'ttfsource',
         data: {
-            inname: 'testout2.tar',
+            inname: 'testout_fan_apa0.tar',
+            tag: 'ROILoose',
         },
     }, nin=0, nout=1),
     local frame_sink = g.pnode({
