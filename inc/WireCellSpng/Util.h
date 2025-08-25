@@ -7,7 +7,8 @@
 #ifndef WIRECELLTORCHUTIL
 #define WIRECELLTORCHUTIL
 
-#include <torch/torch.h>
+
+#include "WireCellSpng/Torch.h"
 #include "WireCellUtil/Configuration.h"
 #include "WireCellSpng/ITorchTensorSet.h"
 #include "WireCellSpng/SimpleTorchTensor.h"
